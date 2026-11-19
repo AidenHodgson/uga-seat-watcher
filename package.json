@@ -13,6 +13,7 @@
     "once": "node watcher.mjs --once",
     "test-alert": "node watcher.mjs --test",
     "install-service": "node watcher.mjs --install",
-    "uninstall-service": "node watcher.mjs --uninstall"
+    "uninstall-service": "node watcher.mjs --uninstall",
+    "test": "node --test test/rules.test.mjs test/schedule.test.mjs"
   }
 }

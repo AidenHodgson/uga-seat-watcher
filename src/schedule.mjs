@@ -101,6 +101,7 @@ export function buildSchedules(courses, rules, { strict = true, limit = 8 } = {}
   })(0, []);
 
   const ranked = results
+    .filter((picks) => picks.length) // nothing placed at all is not a schedule
     .map((picks) => {
       const f = describe(picks, rules);
       return { score: Math.round(score(f) * 10) / 10, summary: summary(f), picks: sortPicks(picks), facts: f };
