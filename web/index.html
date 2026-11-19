@@ -67,9 +67,9 @@ label.check{display:flex;gap:8px;align-items:center;color:var(--soft);cursor:poi
 .pick b{min-width:92px}
 .pick .alts{color:var(--quiet);font-size:13px}
 .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
-form .field{margin-bottom:16px}
-form label.l{display:block;font-weight:600;margin-bottom:6px}
-form .hint{color:var(--quiet);font-size:13px;margin-top:4px}
+.field{margin-bottom:16px}
+label.l{display:block;font-weight:600;margin-bottom:6px}
+.hint{color:var(--quiet);font-size:13px;margin-top:4px}
 input[type=text],input[type=number],select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:15px inherit;width:100%;max-width:360px}
 .days{display:flex;gap:6px}
 .day{border:1px solid var(--line);background:var(--panel2);color:var(--quiet);border-radius:10px;padding:7px 11px;cursor:pointer;font-weight:600;user-select:none}
@@ -78,11 +78,25 @@ input[type=text],input[type=number],select{background:var(--panel2);color:var(--
 .course:first-child{border-top:0}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media (max-width:760px){.row{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.course{grid-template-columns:1fr 1fr}}
+.wiz{max-width:640px;margin:30px auto}
+.wiz h1{font-size:28px;margin:0 0 6px}
+.wiz .lead{color:var(--soft);margin:0 0 22px}
+.steps{display:flex;gap:6px;margin-bottom:18px}
+.steps i{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.steps i.on{background:var(--red)}
+.opt{display:block;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.opt.on{border-color:var(--red);background:#2a1a1f}
+.added{display:flex;justify-content:space-between;align-items:center;background:var(--panel2);border-radius:12px;padding:10px 14px;margin-top:8px}
+.added small{color:var(--quiet)}
+.nav{display:flex;justify-content:space-between;margin-top:22px}
+.err{color:#ff8a8a;margin-top:8px}
+.big{font-size:18px;font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);padding:10px 14px;border-radius:10px;display:inline-block;margin:6px 0;user-select:all}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:999px;display:none}
 </style>
 </head>
 <body>
-<header>
+<div id="setup" hidden></div>
+<header id="hdr">
   <div class="top">
     <div class="brand"><i></i>Seat Watcher</div>
     <div class="sub" id="sub">Loading</div>
@@ -96,7 +110,7 @@ input[type=text],input[type=number],select{background:var(--panel2);color:var(--
     <button class="tab" data-tab="settings">Settings</button>
   </div>
 </header>
-<main>
+<main id="main">
   <section id="seats"></section>
   <section id="schedules" hidden></section>
   <section id="settings" hidden></section>
@@ -127,6 +141,8 @@ function rmp(name) {
 
 async function load() {
   S = await (await fetch('/api/state')).json();
+  if (S.needs_setup) { if ($('#setup').hidden) startSetup(); return; }
+  $('#setup').hidden = true; $('#hdr').hidden = false; $('#main').hidden = false;
   const st = S.status;
   const term = S.config.term_name || S.config.term;
   $('#sub').textContent = `${term} · ${st.checking ? 'checking now' : `checked ${ago(st.last_check_at)}`}${st.last_error ? ` · problem: ${st.last_error}` : ''}`;
@@ -310,14 +326,133 @@ function showTab(t) {
   if (t.dataset.tab === 'schedules') renderSchedules();
   if (t.dataset.tab === 'settings') renderSettings();
 }
+
+// ---------- first-time setup ----------
+const W = { step: 0, term: null, termName: '', terms: [], courses: [], rules: { earliest: '09:00', latest: '', skip_days: '', preferred_days: '', allow_online: true }, phone: true, ntfy: '', discord: '', autostart: true, error: '' };
+const TIMES = ['', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '12:00'];
+const ENDS = ['', '14:00', '15:00', '16:00', '16:30', '17:00', '17:30', '18:00', '19:00'];
+const nice = (t) => (t ? clock(t.replace(':', '')) : 'Any time');
+const topic = () => 'seats-' + crypto.getRandomValues(new Uint8Array(6)).reduce((s, b) => s + b.toString(16).padStart(2, '0'), '');
+
+async function startSetup() {
+  $('#hdr').hidden = true; $('#main').hidden = true; $('#setup').hidden = false;
+  W.ntfy = topic();
+  drawSetup();
+  try { W.terms = await (await fetch('/api/terms')).json(); } catch { W.error = "Couldn't reach Athena. Check your internet, then reload this page."; }
+  W.term = W.terms[0]?.code; W.termName = W.terms[0]?.description ?? '';
+  // Default to the next regular term (usually the one being registered for), not summer.
+  const reg = W.terms.find((t) => !/summer/i.test(t.description)); if (reg) { W.term = reg.code; W.termName = reg.description; }
+  drawSetup();
+}
+
+function dayChips(key) {
+  return `<div class="days">${['M', 'T', 'W', 'R', 'F'].map((d) => `<span class="day ${W.rules[key].includes(d) ? 'on' : ''}" data-dk="${key}" data-d="${d}">${DAY[d]}</span>`).join('')}</div>`;
+}
+
+function drawSetup() {
+  const n = 5;
+  const bar = `<div class="steps">${Array.from({ length: n }, (_, i) => `<i class="${i <= W.step ? 'on' : ''}"></i>`).join('')}</div>`;
+  let body = '';
+  const err = W.error ? `<p class="err">${esc(W.error)}</p>` : '';
+  if (W.step === 0) {
+    body = `<h1>Seat Watcher</h1><p class="lead">Tells you when a seat opens in a class that fits your schedule, and builds possible schedules from what's open. No UGA login needed. Takes about 2 minutes.</p>
+      ${S.mac_folder_warning ? `<div class="banner">Heads up: this folder is in ${esc(S.mac_folder_warning)}. macOS blocks background apps from reading that folder, so it would stop working after a restart. Move the uga-seat-watcher folder into your home folder (Finder > Go > Home) and open it from there.</div>` : ''}
+      <div class="card"><h2>Which term?</h2><div style="margin-top:10px">${W.terms.length ? W.terms.map((t) => `<label class="opt ${t.code === W.term ? 'on' : ''}" data-term="${t.code}">${esc(t.description)}</label>`).join('') : '<p class="note">Loading terms from Athena...</p>'}</div></div>`;
+  } else if (W.step === 1) {
+    body = `<h1>Your courses</h1><p class="lead">Add each course you need, like BUSN 4000. It checks Athena as you go.</p>
+      <div class="card"><div style="display:flex;gap:8px"><input type="text" id="wc" placeholder="BUSN 4000" autofocus><button class="btn" id="wadd" type="button">Add</button></div>${err}
+      ${W.courses.map((c, i) => `<div class="added"><div><b>${esc(c.course)}</b> <small>${esc(c.title)}</small><br><small>${c.sections} sections, ${c.open} with open seats</small></div><button class="btn alt" data-wrm="${i}" type="button">Remove</button></div>`).join('') || '<p class="note">None yet.</p>'}</div>`;
+  } else if (W.step === 2) {
+    body = `<h1>Your rules</h1><p class="lead">Sections outside these still show up. They just won't alert you or go in suggested schedules. You can change all of this later.</p>
+      <div class="card"><div class="two">
+        <div class="field"><label class="l">Earliest a class can start</label><select id="we">${TIMES.map((t) => `<option value="${t}" ${t === W.rules.earliest ? 'selected' : ''}>${t ? nice(t) : 'Any time'}</option>`).join('')}</select></div>
+        <div class="field"><label class="l">Latest a class can end</label><select id="wl">${ENDS.map((t) => `<option value="${t}" ${t === W.rules.latest ? 'selected' : ''}>${t ? nice(t) : 'Any time'}</option>`).join('')}</select></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label class="l">Days to skip</label>${dayChips('skip_days')}</div>
+      <div class="field"><label class="l">Days you prefer</label>${dayChips('preferred_days')}<div class="hint">Schedules on these days rank higher.</div></div>
+      <label class="check"><input type="checkbox" id="wo" ${W.rules.allow_online ? 'checked' : ''}> Count online sections</label></div>`;
+  } else if (W.step === 3) {
+    const deskName = S.platform === 'darwin' ? 'Mac' : 'computer';
+    body = `<h1>Alerts</h1><p class="lead">You'll always get a pop-up on this ${deskName}. Want them on your phone too?</p>
+      <div class="card"><label class="check"><input type="checkbox" id="wp" ${W.phone ? 'checked' : ''}> Send alerts to my phone (free ntfy app, no account)</label>
+      ${W.phone ? `<ol class="note" style="font-size:14px;line-height:1.7"><li>Install <b>ntfy</b> from the App Store or Google Play.</li><li>Tap <b>+</b> and subscribe to this topic:<br><span class="big">${esc(W.ntfy)}</span></li><li>Keep it to yourself. Anyone who knows it can see your alerts.</li></ol>` : ''}
+      <div class="field" style="margin-top:12px"><label class="l">Discord webhook (optional)</label><input type="text" id="wd" value="${esc(W.discord)}" placeholder="https://discord.com/api/webhooks/..."></div>
+      <button class="btn alt" id="wtest" type="button">Send a test alert</button>${err}</div>`;
+  } else if (W.step === 4) {
+    const can = S.platform === 'win32' || S.platform === 'darwin';
+    body = `<h1>Ready</h1><p class="lead">Watching ${W.courses.map((c) => c.course).join(', ')} for ${esc(W.termName)}, every 3 minutes.</p>
+      <div class="card">${can ? `<label class="check"><input type="checkbox" id="wa" ${W.autostart ? 'checked' : ''}> Run in the background and start whenever I log in</label><p class="note">Recommended. Otherwise it only runs while the Seat Watcher window stays open.</p>` : `<p class="note">Keep the Seat Watcher window open while you want it watching.</p>`}${err}</div>`;
+  } else if (W.step === 5) {
+    body = `<h1>All set</h1><p class="lead">${esc(W.done || '')}</p><p class="note">Opening your dashboard...</p>`;
+  }
+  const nav = W.step < 5 ? `<div class="nav">${W.step ? '<button class="btn alt" id="wback" type="button">Back</button>' : '<span></span>'}<button class="btn" id="wnext" type="button">${W.step === 4 ? 'Start watching' : 'Next'}</button></div>` : '';
+  $('#setup').innerHTML = `<div class="wiz">${bar}${body}${nav}</div>`;
+  wireSetup();
+}
+
+function wireSetup() {
+  document.querySelectorAll('[data-term]').forEach((el) => (el.onclick = () => { W.term = el.dataset.term; W.termName = el.textContent; drawSetup(); }));
+  document.querySelectorAll('[data-wrm]').forEach((el) => (el.onclick = () => { W.courses.splice(+el.dataset.wrm, 1); drawSetup(); }));
+  document.querySelectorAll('[data-dk]').forEach((el) => (el.onclick = () => {
+    const k = el.dataset.dk, d = el.dataset.d;
+    W.rules[k] = W.rules[k].includes(d) ? W.rules[k].replace(d, '') : W.rules[k] + d;
+    el.classList.toggle('on');
+  }));
+  const add = async () => {
+    const v = $('#wc').value.trim(); if (!v) return;
+    W.error = '';
+    $('#wadd').disabled = true; $('#wadd').textContent = 'Checking...';
+    const r = await fetch(`/api/course?name=${encodeURIComponent(v)}&term=${W.term}`);
+    const d = await r.json();
+    if (!r.ok) W.error = d.error;
+    else if (!d.sections) W.error = `${d.course} has no sections in ${W.termName}.`;
+    else if (W.courses.some((c) => c.course === d.course)) W.error = `${d.course} is already on the list.`;
+    else W.courses.push(d);
+    drawSetup();
+    $('#wc')?.focus();
+  };
+  if ($('#wadd')) { $('#wadd').onclick = add; $('#wc').onkeydown = (e) => e.key === 'Enter' && add(); }
+  if ($('#we')) { $('#we').onchange = (e) => (W.rules.earliest = e.target.value); $('#wl').onchange = (e) => (W.rules.latest = e.target.value); $('#wo').onchange = (e) => (W.rules.allow_online = e.target.checked); }
+  if ($('#wp')) { $('#wp').onchange = (e) => { W.phone = e.target.checked; drawSetup(); }; $('#wd').oninput = (e) => (W.discord = e.target.value.trim()); }
+  if ($('#wtest')) $('#wtest').onclick = async () => {
+    const r = await (await fetch('/api/test-alert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alerts: alertsNow() }) })).json();
+    toast(r.ok ? 'Sent. Check your screen' + (W.phone ? ' and phone.' : '.') : r.problems.join('; '));
+  };
+  if ($('#wa')) $('#wa').onchange = (e) => (W.autostart = e.target.checked);
+  if ($('#wback')) $('#wback').onclick = () => { W.error = ''; W.step--; drawSetup(); };
+  if ($('#wnext')) $('#wnext').onclick = next;
+}
+
+const alertsNow = () => ({ desktop: true, ntfy_topic: W.phone ? W.ntfy : '', discord_webhook: W.discord });
+
+async function next() {
+  W.error = '';
+  if (W.step === 0 && !W.term) return;
+  if (W.step === 1 && !W.courses.length) { W.error = 'Add at least one course.'; return drawSetup(); }
+  if (W.step < 4) { W.step++; return drawSetup(); }
+  $('#wnext').disabled = true; $('#wnext').textContent = 'Starting...';
+  const config = { term: W.term, term_name: W.termName, every_minutes: 3, rules: { ...W.rules, avoid_times: [] }, courses: W.courses.map((c) => ({ course: c.course, enabled: true, targets: [] })), alerts: alertsNow() };
+  const r = await fetch('/api/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config, autostart: W.autostart }) });
+  const d = await r.json();
+  if (!r.ok) { W.error = d.error; return drawSetup(); }
+  W.done = d.message; W.step = 5; drawSetup();
+  // Wait for the watcher (this one, or the background copy taking over) to answer, then show the dashboard.
+  for (let i = 0; i < 60; i++) {
+    await new Promise((res) => setTimeout(res, 2000));
+    try { const st = await (await fetch('/api/state')).json(); if (!st.needs_setup && st.status.last_check_at) { location.hash = ''; return load(); } } catch {}
+  }
+  load();
+}
+
 document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => showTab(t)));
 $('#now').onclick = async () => { $('#now').disabled = true; $('#sub').textContent = 'Checking now...'; await fetch('/api/check', { method: 'POST' }); $('#now').disabled = false; await load(); if (!$('#schedules').hidden) renderSchedules(); };
 $('#reg').onclick = () => window.open(S?.config.school.register_url || 'https://athena.uga.edu', '_blank');
 load().then(() => {
+  if (S.needs_setup) return;
   const t = document.querySelector(`.tab[data-tab="${location.hash.slice(1)}"]`);
   if (t) showTab(t);
 });
-setInterval(() => { if ($('#settings').hidden) load(); }, 20000);
+setInterval(() => { if ($('#settings').hidden && $('#setup').hidden) load(); }, 20000);
 </script>
 </body>
 </html>

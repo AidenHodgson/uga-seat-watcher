@@ -10,5 +10,5 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-node setup.mjs
+node watcher.mjs --open
 pause

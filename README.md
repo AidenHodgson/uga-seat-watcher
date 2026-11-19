@@ -19,22 +19,20 @@ schedules out of what's open right now.
 
 It never registers you for anything. It just tells you, and you register in Athena.
 
-## Setup (about 5 minutes)
+## Setup (about 3 minutes)
 
 1. **Install Node.js** (free) from https://nodejs.org, the LTS version. Skip this if you have it.
 2. **Get this folder** onto your computer and unzip it.
    - **Mac:** put it in your home folder, not Desktop, Documents or Downloads. macOS blocks
      background apps from reading those, so it would stop working after a restart.
-3. **Run setup:**
-   - **Windows:** double-click `Start Here (Windows).cmd`. If Windows warns you, click
-     "More info" then "Run anyway".
-   - **Mac:** right-click `Start Here (Mac).command`, choose Open, then Open again. (Or in Terminal:
-     `cd` into the folder and run `node setup.mjs`.)
-4. Answer the questions: term, your courses, your rules, phone alerts. Say yes to "start it now and
-   every time you log in."
+3. **Double-click the launcher:**
+   - **Windows:** `Start Here (Windows).cmd`. If Windows warns you, click "More info" then "Run anyway".
+   - **Mac:** right-click `Start Here (Mac).command`, choose Open, then Open again.
+4. **Setup opens in your browser.** Pick the term, add your courses, set your rules and turn on phone
+   alerts if you want them. Leave "run in the background" checked.
 
-The dashboard opens at **http://127.0.0.1:4823**. Bookmark it. On Windows it's also in the Start
-menu as "Seat Watcher".
+That's it. The dashboard lives at **http://127.0.0.1:4823**. Bookmark it, or double-click the
+launcher again any time to open it. On Windows it's also in the Start menu as "Seat Watcher".
 
 ## The dashboard
 
@@ -44,7 +42,8 @@ menu as "Seat Watcher".
   that course to "only tell me about these."
 - **Schedules:** possible weeks built from open seats. Uncheck "only sections that fit my rules" to
   see weeks that use backups.
-- **Settings:** change anything from setup. Saved changes apply right away.
+- **Settings:** change anything from setup. Saved changes apply right away. To start setup over,
+  delete `config.json` and run the launcher again.
 
 ## Phone alerts
 
@@ -78,7 +77,7 @@ Run these from this folder.
 
 | Command | What it does |
 |---|---|
-| `node setup.mjs` | Setup questions (again) |
+| `node watcher.mjs --open` | Start it and open the dashboard (what the launcher does) |
 | `node watcher.mjs --once` | One check, printed |
 | `node watcher.mjs find BUSN 4000` | Every section of a course |
 | `node watcher.mjs --test` | Send a test alert |

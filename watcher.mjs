@@ -2,7 +2,7 @@
 /**
  * Seat Watcher: tells you when a seat opens in a UGA class that fits your schedule.
  *
- *   node setup.mjs                   first-time questions (start here)
+ *   node watcher.mjs --open          start (setup in the browser the first time) and open the dashboard
  *   node watcher.mjs                 run: checks every few minutes plus the dashboard
  *   node watcher.mjs --once          one check, printed
  *   node watcher.mjs find BUSN 4000  every section of a course
@@ -17,7 +17,7 @@ import { runCheck, status } from './src/core.mjs';
 import { notify } from './src/notify.mjs';
 import { log } from './src/paths.mjs';
 import { label } from './src/rules.mjs';
-import { serve } from './src/server.mjs';
+import { openBrowser, serve } from './src/server.mjs';
 import { install, uninstall } from './src/service.mjs';
 
 const [major] = process.versions.node.split('.').map(Number);
@@ -31,8 +31,6 @@ const row = (s) =>
   `CRN ${s.crn}  ${label(s).padEnd(18)} ${String(s.seats).padStart(3)} open of ${s.max}${s.waiting ? `, ${s.waiting} waiting` : ''}  ${s.instructor ?? ''}`;
 
 async function loop() {
-  log('seat watcher started');
-  serve();
   let failures = 0;
   for (;;) {
     let minutes = 3;
@@ -52,9 +50,66 @@ async function loop() {
   }
 }
 
+/** Is a watcher already answering on this computer? */
+async function alreadyRunning(port) {
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/state`, { signal: AbortSignal.timeout(1500) });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The normal way in. Starts the dashboard; with no config yet the dashboard shows setup, and the
+ * checking starts once setup is saved. If setup turns on auto-start, this copy hands over to the
+ * background one and exits.
+ */
+async function start({ open }) {
+  const port = loadConfig().port;
+  const url = `http://127.0.0.1:${port}`;
+  // Only the launcher steps aside for a copy that's already running. The background service never
+  // does: during the hand-off from setup, the port is busy for a moment and the dashboard retries.
+  if (open && (await alreadyRunning(port))) {
+    console.log(`Seat Watcher is already running. Opening ${url}`);
+    if (open) openBrowser(url);
+    return;
+  }
+  log('seat watcher started');
+  let looping = false;
+  const begin = () => {
+    if (looping) return;
+    looping = true;
+    loop();
+  };
+  serve({
+    onSetup: async (config, autostart) => {
+      if (autostart && (process.platform === 'win32' || process.platform === 'darwin')) {
+        try {
+          install(config.port);
+          console.log('\nAll set. Seat Watcher now runs in the background and starts whenever you log in.');
+          console.log('You can close this window.');
+          // Let the page get its answer, then step aside so the background copy takes the port.
+          setTimeout(() => process.exit(0), 1500);
+          return { handoff: true, message: 'Seat Watcher now runs in the background and starts whenever you log in.' };
+        } catch (e) {
+          log(`auto-start setup failed: ${e.message.split('\n')[0]}`);
+          begin();
+          return { handoff: false, message: `Couldn't set up auto-start (${e.message.split('\n')[0]}). It's running now, but only while this window stays open.` };
+        }
+      }
+      begin();
+      return { handoff: false, message: 'Running. Keep the Seat Watcher window open (you can minimize it).' };
+    },
+  });
+  if (hasConfig()) begin();
+  else console.log(`First time? Finish setup in your browser: ${url}`);
+  if (open) setTimeout(() => openBrowser(url), 600);
+}
+
 const [cmd, ...args] = process.argv.slice(2);
-if (!hasConfig() && cmd !== 'find') {
-  console.log('No config.json yet. Run "node setup.mjs" first.');
+if (!hasConfig() && ['--once', '--test', '--install'].includes(cmd)) {
+  console.log('Not set up yet. Run "node watcher.mjs --open" and finish setup in your browser.');
   process.exit(1);
 }
 
@@ -86,5 +141,5 @@ if (cmd === 'find') {
 } else if (cmd === '--uninstall') {
   console.log(uninstall());
 } else {
-  await loop();
+  await start({ open: cmd === '--open' });
 }

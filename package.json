@@ -5,10 +5,11 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "setup": "node setup.mjs",
-    "start": "node watcher.mjs",
+    "start": "node watcher.mjs --open",
     "once": "node watcher.mjs --once",
     "test-alert": "node watcher.mjs --test",
     "install-service": "node watcher.mjs --install",
