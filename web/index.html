@@ -411,7 +411,7 @@ function wireSetup() {
     drawSetup();
     $('#wc')?.focus();
   };
-  if ($('#wadd')) { $('#wadd').onclick = add; $('#wc').onkeydown = (e) => e.key === 'Enter' && add(); }
+  if ($('#wadd')) { $('#wadd').onclick = add; $('#wc').onkeydown = (e) => { if (e.key === 'Enter') add(); }; }
   if ($('#we')) { $('#we').onchange = (e) => (W.rules.earliest = e.target.value); $('#wl').onchange = (e) => (W.rules.latest = e.target.value); $('#wo').onchange = (e) => (W.rules.allow_online = e.target.checked); }
   if ($('#wp')) { $('#wp').onchange = (e) => { W.phone = e.target.checked; drawSetup(); }; $('#wd').oninput = (e) => (W.discord = e.target.value.trim()); }
   if ($('#wtest')) $('#wtest').onclick = async () => {
