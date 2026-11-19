@@ -26,7 +26,8 @@ export const DEFAULTS = {
   },
   courses: [], // { course: "BUSN 4000", enabled: true, targets: [] }
   alerts: { desktop: true, ntfy_topic: '', discord_webhook: '' },
-  port: 4823,
+  // Not 4823, so it never collides with the Basecamp seat watcher on the same laptop.
+  port: 4830,
 };
 
 export function normalize(raw) {

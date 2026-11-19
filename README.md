@@ -31,7 +31,7 @@ It never registers you for anything. It just tells you, and you register in Athe
 4. **Setup opens in your browser.** Pick the term, add your courses, set your rules and turn on phone
    alerts if you want them. Leave "run in the background" checked.
 
-That's it. The dashboard lives at **http://127.0.0.1:4823**. Bookmark it, or double-click the
+That's it. The dashboard lives at **http://127.0.0.1:4830**. Bookmark it, or double-click the
 launcher again any time to open it. On Windows it's also in the Start menu as "Seat Watcher".
 
 ## The dashboard

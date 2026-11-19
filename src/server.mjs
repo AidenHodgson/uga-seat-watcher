@@ -1,4 +1,4 @@
-// The dashboard at http://127.0.0.1:4823, including first-time setup. Only this computer can open it.
+// The dashboard at http://127.0.0.1:4830, including first-time setup. Only this computer can open it.
 
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
@@ -67,6 +67,7 @@ export function serve({ onSetup } = {}) {
         const c = loadConfig();
         return send(res, 200, {
           needs_setup: !hasConfig(),
+          root: ROOT,
           config: c,
           status: { ...status, courses: view(c) },
           platform: process.platform,

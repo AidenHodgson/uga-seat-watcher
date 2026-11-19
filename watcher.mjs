@@ -11,11 +11,12 @@
  *   node watcher.mjs --uninstall     stop starting automatically
  */
 
+import path from 'node:path';
 import { Athena } from './src/athena.mjs';
 import { hasConfig, loadConfig } from './src/config.mjs';
 import { runCheck, status } from './src/core.mjs';
 import { notify } from './src/notify.mjs';
-import { log } from './src/paths.mjs';
+import { ROOT, log } from './src/paths.mjs';
 import { label } from './src/rules.mjs';
 import { openBrowser, serve } from './src/server.mjs';
 import { install, uninstall } from './src/service.mjs';
@@ -50,13 +51,15 @@ async function loop() {
   }
 }
 
-/** Is a watcher already answering on this computer? */
+/** What's already answering on this port: { root } for a Seat Watcher, { other: true } for something else, null for nothing. */
 async function alreadyRunning(port) {
   try {
     const r = await fetch(`http://127.0.0.1:${port}/api/state`, { signal: AbortSignal.timeout(1500) });
-    return r.ok;
-  } catch {
-    return false;
+    if (!r.ok) return { other: true };
+    const d = await r.json();
+    return d.root ? { root: d.root } : { other: true };
+  } catch (e) {
+    return e.cause?.code === 'ECONNREFUSED' || e.name === 'TimeoutError' ? null : { other: true };
   }
 }
 
@@ -70,10 +73,22 @@ async function start({ open }) {
   const url = `http://127.0.0.1:${port}`;
   // Only the launcher steps aside for a copy that's already running. The background service never
   // does: during the hand-off from setup, the port is busy for a moment and the dashboard retries.
-  if (open && (await alreadyRunning(port))) {
+  const running = open ? await alreadyRunning(port) : null;
+  if (running?.root && path.resolve(running.root) === ROOT) {
     console.log(`Seat Watcher is already running. Opening ${url}`);
-    if (open) openBrowser(url);
+    openBrowser(url);
     return;
+  }
+  if (running?.root) {
+    console.log(`\nAnother copy of Seat Watcher is already running, from:\n  ${running.root}`);
+    console.log('Stop it first: open that folder in a terminal and run  node watcher.mjs --uninstall');
+    console.log(`Then run this launcher again. (Its dashboard: ${url})`);
+    process.exit(1);
+  }
+  if (running?.other) {
+    console.log(`\nSomething else on this computer is using port ${port}.`);
+    console.log('Close it, or change "port" in config.json to another number like 4831, then try again.');
+    process.exit(1);
   }
   log('seat watcher started');
   let looping = false;
