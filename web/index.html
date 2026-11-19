@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seat Watcher</title>
+<style>
+:root{
+  --bg:#14161a;--panel:#1c1f25;--panel2:#23272f;--line:#2e333d;--text:#eef0f3;--soft:#c3c8d1;--quiet:#8b929e;--faint:#5d6470;
+  --red:#ba0c2f;--green:#5fd08a;--amber:#f2b84b;--blue:#6aa7ff;
+  --r:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--blue)}
+header{position:sticky;top:0;z-index:5;background:rgba(20,22,26,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top{max-width:1100px;margin:0 auto;padding:14px 20px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:20px;display:flex;align-items:center;gap:8px}
+.brand i{width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block}
+.sub{color:var(--quiet);font-size:13px}
+.spacer{flex:1}
+.tabs{max-width:1100px;margin:0 auto;padding:10px 20px 0;display:flex;gap:4px}
+.tab{background:none;border:0;color:var(--quiet);font:600 14px inherit;padding:10px 14px;border-bottom:2px solid transparent;cursor:pointer}
+.tab.on{color:var(--text);border-color:var(--red)}
+main{max-width:1100px;margin:0 auto;padding:20px 20px 80px}
+button.btn{background:var(--red);color:#fff;border:0;border-radius:999px;padding:9px 16px;font:600 14px inherit;cursor:pointer}
+button.btn.alt{background:var(--panel2);color:var(--text)}
+button.btn:disabled{opacity:.5;cursor:default}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px}
+.card h2{margin:0;font-size:17px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.card h2 small{color:var(--quiet);font-weight:400;font-size:13px}
+.row{display:grid;grid-template-columns:150px 1fr 120px 150px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;margin-top:6px;border-left:3px solid transparent;background:var(--panel2)}
+.row.full{opacity:.38;background:transparent}
+.row.fit{border-left-color:var(--green)}
+.row.nofit{border-left-color:var(--amber)}
+.when{font-weight:600}
+.who{color:var(--soft);font-size:14px}
+.who a{color:var(--soft);text-decoration:none;border-bottom:1px dotted var(--faint)}
+.who a:hover{color:var(--text)}
+.crn{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--soft);cursor:pointer;font-size:13px}
+.crn:hover{color:var(--text)}
+.seats{text-align:right;font-weight:700}
+.seats.open{color:var(--green)}.seats.none{color:var(--quiet)}
+.seats small{display:block;font-weight:400;color:var(--quiet);font-size:12px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
+.chip{font-size:11.5px;border-radius:999px;padding:2px 8px;background:#2d2a20;color:var(--amber)}
+.chip.ok{background:#1d2e24;color:var(--green)}
+.chip.star{background:#1f2a3d;color:var(--blue)}
+.star{background:none;border:0;color:var(--faint);font-size:18px;cursor:pointer;padding:0 4px}
+.star.on{color:var(--blue)}
+.note{color:var(--quiet);font-size:13px;margin:6px 0 0}
+.banner{background:#2d2a20;color:var(--amber);border-radius:12px;padding:10px 14px;margin-bottom:14px}
+.banner.ok{background:#1d2e24;color:var(--green)}
+.event{padding:8px 0;border-top:1px solid var(--line)}.event:first-child{border-top:0}
+.event b{display:block}.event span{color:var(--quiet);font-size:13px;white-space:pre-line}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+label.check{display:flex;gap:8px;align-items:center;color:var(--soft);cursor:pointer}
+.grid{display:grid;grid-template-columns:44px repeat(5,1fr);margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative}
+.grid .h{background:var(--panel2);text-align:center;font-size:12px;color:var(--quiet);padding:6px 0;font-weight:600}
+.col{position:relative;border-left:1px solid var(--line)}
+.hours{position:relative}
+.hr{position:absolute;left:0;right:0;border-top:1px dashed #262a32;font-size:10px;color:var(--faint);padding-left:4px}
+.block{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 6px;font-size:11.5px;line-height:1.25;overflow:hidden;color:#0d0f12;font-weight:600}
+.block span{display:block;font-weight:400;opacity:.85}
+.picks{margin-top:10px;display:grid;gap:6px}
+.pick{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:14px}
+.pick b{min-width:92px}
+.pick .alts{color:var(--quiet);font-size:13px}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+form .field{margin-bottom:16px}
+form label.l{display:block;font-weight:600;margin-bottom:6px}
+form .hint{color:var(--quiet);font-size:13px;margin-top:4px}
+input[type=text],input[type=number],select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:15px inherit;width:100%;max-width:360px}
+.days{display:flex;gap:6px}
+.day{border:1px solid var(--line);background:var(--panel2);color:var(--quiet);border-radius:10px;padding:7px 11px;cursor:pointer;font-weight:600;user-select:none}
+.day.on{background:#3a1820;border-color:var(--red);color:#fff}
+.course{display:grid;grid-template-columns:120px 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.course:first-child{border-top:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:760px){.row{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.course{grid-template-columns:1fr 1fr}}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:999px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="brand"><i></i>Seat Watcher</div>
+    <div class="sub" id="sub">Loading</div>
+    <div class="spacer"></div>
+    <button class="btn alt" id="now">Check now</button>
+    <button class="btn" id="reg">Open Athena</button>
+  </div>
+  <div class="tabs">
+    <button class="tab on" data-tab="seats">Seats</button>
+    <button class="tab" data-tab="schedules">Schedules</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </div>
+</header>
+<main>
+  <section id="seats"></section>
+  <section id="schedules" hidden></section>
+  <section id="settings" hidden></section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const DAY = { M: 'Mon', T: 'Tue', W: 'Wed', R: 'Thu', F: 'Fri', S: 'Sat', U: 'Sun' };
+const COLORS = ['#ffb4a2', '#a3d9ff', '#b9f3b0', '#ffe08a', '#d7b8ff', '#9ff0e0', '#ffc3e1', '#c9d4ff'];
+let S = null; // last /api/state
+let onlyFits = false;
+let strict = true;
+
+const clock = (t) => { if (!t) return 'Online'; const h = +t.slice(0, 2); return `${h % 12 || 12}:${t.slice(2)}${h < 12 ? 'am' : 'pm'}`; };
+const when = (s) => (s.online || !s.begin ? 'Online' : s.meetings.map((m) => `${m.days} ${clock(m.begin)}`).join(' + '));
+const ago = (iso) => { if (!iso) return 'never'; const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 1 ? 'just now' : m === 1 ? '1 minute ago' : m < 60 ? `${m} minutes ago` : `${Math.round(m / 60)}h ago`; };
+const toast = (t) => { const el = $('#toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => (el.style.display = 'none'), 2200); };
+const copy = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(`Copied ${what}`); } catch { toast(t); } };
+
+function rmp(name) {
+  if (!name) return '';
+  const first = name.split(',')[0].trim();
+  const id = S.config.school.rmp_school_id;
+  const url = id ? `https://www.ratemyprofessors.com/search/professors/${encodeURIComponent(id)}?q=${encodeURIComponent(first)}` : `https://www.ratemyprofessors.com/search/professors?q=${encodeURIComponent(first)}`;
+  return `<a href="${url}" target="_blank" rel="noopener" title="Look up on Rate My Professors">${esc(name)} ↗</a>`;
+}
+
+async function load() {
+  S = await (await fetch('/api/state')).json();
+  const st = S.status;
+  const term = S.config.term_name || S.config.term;
+  $('#sub').textContent = `${term} · ${st.checking ? 'checking now' : `checked ${ago(st.last_check_at)}`}${st.last_error ? ` · problem: ${st.last_error}` : ''}`;
+  renderSeats();
+  if (!$('#settings').hidden && !$('#settings').dataset.ready) renderSettings();
+}
+
+function renderSeats() {
+  const st = S.status;
+  const courseCfg = Object.fromEntries(S.config.courses.map((c) => [c.course, c]));
+  let html = '';
+  if (!S.config.courses.length) html += `<div class="banner">No courses yet. Add some in Settings.</div>`;
+  if (st.events.length) {
+    html += `<div class="card"><h2>Recent alerts</h2>${st.events.slice(0, 5).map((e) => `<div class="event"><b>${esc(e.title)}</b><span>${esc(e.body)} · ${ago(e.at)}</span></div>`).join('')}</div>`;
+  }
+  html += `<div class="toolbar"><label class="check"><input type="checkbox" id="onlyFits" ${onlyFits ? 'checked' : ''}> Only show sections that fit my rules</label><span class="note">Bright = seats open · faded = full · <span style="color:var(--green)">green edge</span> fits your rules · <span style="color:var(--amber)">amber edge</span> doesn't · click a CRN to copy it</span></div>`;
+  for (const c of st.courses) {
+    const cfg = courseCfg[c.course] ?? {};
+    if (!c.ok) { html += `<div class="card"><h2>${esc(c.course)}</h2><p class="note">Couldn't check: ${esc(c.error)}</p></div>`; continue; }
+    const secs = [...c.sections].sort((a, b) => (b.seats > 0) - (a.seats > 0) || (b.fits - a.fits) || String(a.begin ?? '9999').localeCompare(String(b.begin ?? '9999')));
+    const open = secs.filter((s) => s.seats > 0);
+    const fitOpen = open.filter((s) => s.fits);
+    const title = secs[0]?.title ?? '';
+    let backup = '';
+    if (!c.targeted && secs.length && !fitOpen.length) {
+      backup = open.length
+        ? `<div class="banner">Nothing that fits your rules has a seat. Best backups: ${open.slice(0, 2).map((s) => `${when(s)} (CRN ${s.crn}, ${s.seats} open)`).join(' or ')}. A seat beats no seat; the watcher tells you if something better opens.</div>`
+        : `<div class="banner">Every section is full. Join a waitlist in Athena if there is one.</div>`;
+    }
+    const targetsNote = c.targeted ? `<p class="note">Switch mode: only alerting for CRN ${cfg.targets.join(', ')}. Tap ☆ to change.</p>` : `<p class="note">Already registered? Star (☆) the sections you'd switch to, and it only alerts for those.</p>`;
+    html += `<div class="card"><h2>${esc(c.course)} <small>${esc(title)} · ${open.length} of ${secs.length} sections have seats · ${fitOpen.length} fit your rules</small></h2>${targetsNote}${backup}`;
+    for (const s of secs) {
+      if (onlyFits && !s.fits) continue;
+      const isTarget = (cfg.targets ?? []).includes(s.crn);
+      const chips = s.fits ? [`<span class="chip ok">${c.targeted ? 'switch target' : 'fits'}</span>`] : s.why.map((w) => `<span class="chip">${esc(w)}</span>`);
+      if (s.waiting) chips.push(`<span class="chip">${s.waiting} on waitlist</span>`);
+      html += `<div class="row ${s.seats > 0 ? '' : 'full'} ${s.fits ? 'fit' : 'nofit'}">
+        <div><div class="when">${esc(when(s))}</div><div class="chips">${chips.join('')}</div></div>
+        <div class="who">${rmp(s.instructor) || '<span class="note">Instructor TBA</span>'}${s.meetings[0]?.building ? `<div class="note" style="margin:0">${esc(s.meetings[0].building)} ${esc(s.meetings[0].room ?? '')}</div>` : ''}</div>
+        <div><span class="crn" data-crn="${s.crn}">CRN ${s.crn}</span><button class="star ${isTarget ? 'on' : ''}" data-course="${esc(c.course)}" data-star="${s.crn}" title="Switch target">${isTarget ? '★' : '☆'}</button></div>
+        <div class="seats ${s.seats > 0 ? 'open' : 'none'}">${s.seats > 0 ? `${s.seats} open` : 'Full'}<small>of ${s.max}${s.raw_seats > s.seats ? `, ${s.raw_seats - s.seats} held for waitlist` : ''}</small></div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  $('#seats').innerHTML = html;
+  $('#onlyFits').onchange = (e) => { onlyFits = e.target.checked; renderSeats(); };
+  document.querySelectorAll('[data-crn]').forEach((el) => (el.onclick = () => copy(el.dataset.crn, `CRN ${el.dataset.crn}`)));
+  document.querySelectorAll('[data-star]').forEach((el) => (el.onclick = () => toggleTarget(el.dataset.course, el.dataset.star)));
+}
+
+async function toggleTarget(course, crn) {
+  const cfg = structuredClone(S.config);
+  const c = cfg.courses.find((x) => x.course === course);
+  c.targets = c.targets ?? [];
+  c.targets = c.targets.includes(crn) ? c.targets.filter((t) => t !== crn) : [...c.targets, crn];
+  await save(cfg, c.targets.length ? `Watching ${c.targets.length} switch target${c.targets.length > 1 ? 's' : ''} for ${course}` : `${course} back to normal watching`);
+}
+
+async function save(cfg, msg) {
+  const r = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+  const d = await r.json();
+  if (!r.ok) { toast(d.error); return false; }
+  toast(msg || 'Saved');
+  await load();
+  return true;
+}
+
+// ---------- schedules ----------
+async function renderSchedules() {
+  $('#schedules').innerHTML = `<p class="note">Building schedules from what's open right now...</p>`;
+  const r = await (await fetch(`/api/schedules?strict=${strict ? 1 : 0}`)).json();
+  const colors = Object.fromEntries(S.config.courses.map((c, i) => [c.course, COLORS[i % COLORS.length]]));
+  let html = `<div class="toolbar"><label class="check"><input type="checkbox" id="strict" ${strict ? 'checked' : ''}> Only sections that fit my rules</label><span class="note">Built from sections with open seats right now (waitlist seats don't count). Ranked by fewest days on campus, then no early mornings, late nights or long gaps.</span></div>`;
+  if (r.noSeats.length) html += `<div class="banner">No open ${strict ? 'sections that fit your rules' : 'sections'} in ${r.noSeats.join(', ')}. ${strict ? 'Uncheck "Only sections that fit my rules" to see backups.' : 'Join a waitlist or let the watcher catch a drop.'}</div>`;
+  else if (!r.complete && r.missing.length) html += `<div class="banner">No week fits everything. These leave out ${r.missing.join(', ')}.</div>`;
+  if (!r.schedules.length) html += `<div class="card"><p class="note">Nothing to build yet.</p></div>`;
+  r.schedules.forEach((s, i) => {
+    const crns = s.picks.map((p) => p.sections[0].crn).join(', ');
+    html += `<div class="card"><h2>Option ${i + 1} <small>${esc(s.summary)}</small></h2>${grid(s.picks, colors)}<div class="picks">${s.picks
+      .map((p) => `<div class="pick"><span class="dot" style="background:${colors[p.course]}"></span><b>${esc(p.course)}</b><span>${esc(p.meetings.map((m) => `${m.days} ${clock(m.begin)}-${clock(m.end)}`).join(' + '))}</span><span>CRN <span class="crn" data-crn="${p.sections[0].crn}">${p.sections[0].crn}</span> (${p.sections[0].seats} open${p.sections[0].instructor ? `, ${esc(p.sections[0].instructor)}` : ''})</span>${p.sections.length > 1 ? `<span class="alts">or ${p.sections.slice(1, 5).map((x) => `${x.crn} (${x.seats})`).join(', ')}${p.sections.length > 5 ? '...' : ''}</span>` : ''}</div>`)
+      .join('')}</div><p class="note"><button class="btn alt" data-copy="${crns}">Copy CRNs</button>&nbsp; Paste into Athena's "Enter CRNs" tab.</p></div>`;
+  });
+  $('#schedules').innerHTML = html;
+  $('#strict').onchange = (e) => { strict = e.target.checked; renderSchedules(); };
+  document.querySelectorAll('[data-crn]').forEach((el) => (el.onclick = () => copy(el.dataset.crn, `CRN ${el.dataset.crn}`)));
+  document.querySelectorAll('[data-copy]').forEach((el) => (el.onclick = () => copy(el.dataset.copy, 'CRNs')));
+}
+
+function grid(picks, colors) {
+  const all = picks.flatMap((p) => p.meetings);
+  const mins = (t) => +t.slice(0, 2) * 60 + +t.slice(2);
+  const start = Math.min(8 * 60, ...all.map((m) => Math.floor(mins(m.begin) / 60) * 60));
+  const end = Math.max(17 * 60, ...all.map((m) => Math.ceil(mins(m.end) / 60) * 60));
+  const px = 0.7, height = (end - start) * px;
+  const days = ['M', 'T', 'W', 'R', 'F'];
+  let h = `<div class="grid"><div class="h"></div>${days.map((d) => `<div class="h">${DAY[d]}</div>`).join('')}`;
+  h += `<div class="hours" style="height:${height}px">`;
+  for (let t = start; t < end; t += 60) h += `<div class="hr" style="top:${(t - start) * px}px">${((t / 60) % 12) || 12}${t < 720 ? 'a' : 'p'}</div>`;
+  h += `</div>`;
+  for (const d of days) {
+    h += `<div class="col" style="height:${height}px">`;
+    for (let t = start; t < end; t += 60) h += `<div class="hr" style="top:${(t - start) * px}px"></div>`;
+    for (const p of picks) for (const m of p.meetings) if (m.days.includes(d)) {
+      h += `<div class="block" style="top:${(mins(m.begin) - start) * px}px;height:${(mins(m.end) - mins(m.begin)) * px}px;background:${colors[p.course]}">${esc(p.course)}<span>${clock(m.begin)}</span></div>`;
+    }
+    h += `</div>`;
+  }
+  return h + `</div>`;
+}
+
+// ---------- settings ----------
+async function renderSettings() {
+  const c = S.config;
+  let terms = [];
+  try { terms = await (await fetch('/api/terms')).json(); } catch {}
+  const dayPick = (name, value) => `<div class="days" data-days="${name}">${['M', 'T', 'W', 'R', 'F'].map((d) => `<span class="day ${value.includes(d) ? 'on' : ''}" data-d="${d}">${DAY[d]}</span>`).join('')}</div>`;
+  $('#settings').dataset.ready = '1';
+  $('#settings').innerHTML = `<form id="f" onsubmit="return false">
+  <div class="card"><h2>Courses</h2><div id="courses"></div>
+    <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newCourse" placeholder="Add a course, like BUSN 4000"><button class="btn alt" id="add" type="button">Add</button></div>
+    <p class="note">Switch targets: if you're already registered and only want to hear about certain sections, put their CRNs here (or star them on the Seats tab).</p></div>
+  <div class="card"><h2>Your rules</h2><p class="note">Sections outside your rules still show on the Seats tab. They just don't send alerts or go in suggested schedules.</p>
+    <div class="two">
+      <div class="field"><label class="l">Earliest start</label><input type="text" name="earliest" value="${esc(c.rules.earliest)}" placeholder="any"><div class="hint">Like 9:30. Blank means any time.</div></div>
+      <div class="field"><label class="l">Latest end</label><input type="text" name="latest" value="${esc(c.rules.latest)}" placeholder="any"><div class="hint">Like 17:00 for 5pm. Blank means any time.</div></div>
+    </div>
+    <div class="field"><label class="l">Days to skip</label>${dayPick('skip_days', c.rules.skip_days)}</div>
+    <div class="field"><label class="l">Days you prefer</label>${dayPick('preferred_days', c.rules.preferred_days)}<div class="hint">Schedules on these days rank higher and alerts call them out.</div></div>
+    <div class="field"><label class="check"><input type="checkbox" name="allow_online" ${c.rules.allow_online ? 'checked' : ''}> Count online sections</label></div>
+  </div>
+  <div class="card"><h2>Alerts</h2>
+    <div class="field"><label class="check"><input type="checkbox" name="desktop" ${c.alerts.desktop !== false ? 'checked' : ''}> Pop-up on this computer</label></div>
+    <div class="field"><label class="l">Phone alerts with ntfy</label><input type="text" name="ntfy_topic" value="${esc(c.alerts.ntfy_topic)}" placeholder="off"><div class="hint">Install the free "ntfy" app and subscribe to this topic. Keep it private. <a href="#" id="gen">Make one</a></div></div>
+    <div class="field"><label class="l">Discord webhook</label><input type="text" name="discord_webhook" value="${esc(c.alerts.discord_webhook)}" placeholder="off"></div>
+    <button class="btn alt" id="test" type="button">Send a test alert</button>
+  </div>
+  <div class="card"><h2>Watching</h2>
+    <div class="two">
+      <div class="field"><label class="l">Term</label><select name="term">${(terms.length ? terms : [{ code: c.term, description: c.term_name || c.term }]).map((t) => `<option value="${t.code}" ${t.code === c.term ? 'selected' : ''}>${esc(t.description)}</option>`).join('')}</select></div>
+      <div class="field"><label class="l">Check every (minutes)</label><input type="number" name="every_minutes" min="2" max="60" value="${c.every_minutes}"><div class="hint">2 or more, please. It's one request per course.</div></div>
+    </div>
+    <div class="field"><label class="l">Rate My Professors school id</label><input type="text" name="rmp_school_id" value="${esc(c.school.rmp_school_id)}" placeholder="optional"><div class="hint">Find your school on ratemyprofessors.com; the number in the address (/school/1234) narrows professor links to your school.</div></div>
+  </div>
+  <button class="btn" id="saveBtn" type="button">Save</button>
+  </form>`;
+  const courses = structuredClone(c.courses);
+  const drawCourses = () => {
+    $('#courses').innerHTML = courses.map((x, i) => `<div class="course"><b>${esc(x.course)}</b><input type="text" data-targets="${i}" value="${esc((x.targets ?? []).join(', '))}" placeholder="Switch targets (CRNs), optional"><label class="check"><input type="checkbox" data-on="${i}" ${x.enabled !== false ? 'checked' : ''}> Watch</label><button class="btn alt" type="button" data-rm="${i}">Remove</button></div>`).join('') || '<p class="note">None yet.</p>';
+    document.querySelectorAll('[data-rm]').forEach((el) => (el.onclick = () => { courses.splice(+el.dataset.rm, 1); drawCourses(); }));
+    document.querySelectorAll('[data-on]').forEach((el) => (el.onchange = () => (courses[+el.dataset.on].enabled = el.checked)));
+    document.querySelectorAll('[data-targets]').forEach((el) => (el.oninput = () => (courses[+el.dataset.targets].targets = el.value.split(/[ ,]+/).filter(Boolean))));
+  };
+  drawCourses();
+  $('#add').onclick = () => { const v = $('#newCourse').value.trim(); if (!v) return; courses.push({ course: v, enabled: true, targets: [] }); $('#newCourse').value = ''; drawCourses(); };
+  document.querySelectorAll('.day').forEach((el) => (el.onclick = () => el.classList.toggle('on')));
+  $('#gen').onclick = (e) => { e.preventDefault(); $('[name=ntfy_topic]').value = 'seats-' + crypto.getRandomValues(new Uint8Array(6)).reduce((s, b) => s + b.toString(16).padStart(2, '0'), ''); };
+  $('#test').onclick = async () => { const r = await (await fetch('/api/test-alert', { method: 'POST' })).json(); toast(r.ok ? 'Sent. Save first if you just changed alerts.' : r.problems.join('; ')); };
+  $('#saveBtn').onclick = async () => {
+    const f = $('#f');
+    const days = (n) => [...document.querySelectorAll(`[data-days=${n}] .day.on`)].map((el) => el.dataset.d).join('');
+    const sel = f.term;
+    const cfg = {
+      ...S.config,
+      term: sel.value,
+      term_name: sel.options[sel.selectedIndex]?.text ?? '',
+      every_minutes: +f.every_minutes.value,
+      school: { ...S.config.school, rmp_school_id: f.rmp_school_id.value.trim() },
+      rules: { ...S.config.rules, earliest: f.earliest.value.trim(), latest: f.latest.value.trim(), skip_days: days('skip_days'), preferred_days: days('preferred_days'), allow_online: f.allow_online.checked },
+      alerts: { desktop: f.desktop.checked, ntfy_topic: f.ntfy_topic.value.trim(), discord_webhook: f.discord_webhook.value.trim() },
+      courses,
+    };
+    if (await save(cfg, 'Saved. Checking with the new settings...')) { delete $('#settings').dataset.ready; renderSettings(); }
+  };
+}
+
+function showTab(t) {
+  document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === t));
+  history.replaceState(null, '', '#' + t.dataset.tab);
+  for (const id of ['seats', 'schedules', 'settings']) $('#' + id).hidden = id !== t.dataset.tab;
+  if (t.dataset.tab === 'schedules') renderSchedules();
+  if (t.dataset.tab === 'settings') renderSettings();
+}
+document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => showTab(t)));
+$('#now').onclick = async () => { $('#now').disabled = true; $('#sub').textContent = 'Checking now...'; await fetch('/api/check', { method: 'POST' }); $('#now').disabled = false; await load(); if (!$('#schedules').hidden) renderSchedules(); };
+$('#reg').onclick = () => window.open(S?.config.school.register_url || 'https://athena.uga.edu', '_blank');
+load().then(() => {
+  const t = document.querySelector(`.tab[data-tab="${location.hash.slice(1)}"]`);
+  if (t) showTab(t);
+});
+setInterval(() => { if ($('#settings').hidden) load(); }, 20000);
+</script>
+</body>
+</html>

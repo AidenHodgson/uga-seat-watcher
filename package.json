@@ -1,0 +1,17 @@
+{
+  "name": "uga-seat-watcher",
+  "version": "1.0.0",
+  "description": "Tells you when a seat opens in a UGA class that fits your schedule. No login, no dependencies.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "setup": "node setup.mjs",
+    "start": "node watcher.mjs",
+    "once": "node watcher.mjs --once",
+    "test-alert": "node watcher.mjs --test",
+    "install-service": "node watcher.mjs --install",
+    "uninstall-service": "node watcher.mjs --uninstall"
+  }
+}
