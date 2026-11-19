@@ -209,7 +209,7 @@
         const risk = s && (s.waiting > 0 || s.seats <= 0);
         box.append(
           risk
-            ? `${s.waiting ? `${s.waiting} people are waiting for it, so your seat goes to them` : "It's full, so your seat goes to whoever grabs it"} and you likely can't get back in. To switch sections, add the new CRN first and drop this one in the same submit.`
+            ? `${s.waiting ? `${s.waiting} ${s.waiting === 1 ? 'person is' : 'people are'} waiting for it, so your seat goes to them` : "It's full, so your seat goes to whoever grabs it"} and you likely can't get back in. To switch sections, add the new CRN first and drop this one in the same submit.`
             : 'To switch sections, add the new CRN first and drop this one in the same submit, so you never end up with neither.',
         );
       }

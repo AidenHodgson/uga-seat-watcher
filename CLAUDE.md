@@ -11,7 +11,12 @@ before you say something works.
   install it by unzipping a folder. Don't add packages unless there's truly no other way, and ask
   first.
 - One process does everything: checks Athena every few minutes, keeps a little state, sends alerts,
-  and serves a dashboard on `http://127.0.0.1:4830` (only this computer can open it).
+  and serves a dashboard on `http://127.0.0.1:4830` (only this computer can open it). The MCP server
+  (`mcp.mjs`) and the Chrome extension (`extension/`) are thin clients of that dashboard's JSON API;
+  they never talk to Athena themselves.
+- Each course in `config.json` can hold `registered` and `waitlisted` CRNs (the student's own
+  sections). `enabled` means **alerts on**. Courses with a held section are checked even with alerts
+  off, so the week on Home stays current.
 - Setup happens in that dashboard the first time (no `config.json` yet). Settings are saved to
   `config.json` in this folder and re-read on every check.
 - It never logs in to Athena and never registers anyone for anything. That's a hard line; see
@@ -22,15 +27,21 @@ before you say something works.
 | File | What it does |
 |---|---|
 | `watcher.mjs` | Entry point and command line (`--open`, `--once`, `find`, `--test`, `--install`, `--uninstall`). Starts the dashboard and the check loop, and hands off to the background service after setup. |
-| `src/athena.mjs` | Talks to Athena's public Browse Classes search. Turns Athena's JSON into our section shape (`toSection`). |
+| `src/athena.mjs` | Talks to Athena's public Browse Classes search. Turns Athena's JSON into our section shape (`toSection`), un-escaping Athena's HTML entities. |
+| `src/advice.mjs` | Your week and next moves (`advise`), waitlist odds (`waitlistOdds`). The UGA registration rules live in its header comment. |
+| `src/finder.mjs` | The elective finder: whole-term cache (`loadTerm`, at most every 6 hours, only on demand) and filters (`find`). |
+| `src/campus.mjs` | Rough walking times between campus zones, for tight-walk warnings. Unknown buildings never warn. |
+| `src/dates.mjs` | Key registration dates per term (waitlist purge, drop/add). Add each new term here. |
+| `mcp.mjs` | MCP server (stdio, hand-rolled JSON-RPC) for Claude: my_week, course_sections, find_classes, possible_schedules, set_my_section, seat_history. Calls the dashboard API. |
+| `extension/` | Chrome extension (MV3): colors Athena results, syncs the Summary panel to `/api/import`, warns before risky drops, fills CRNs. Reads tables by header text. Never clicks Submit. |
 | `src/rules.mjs` | Does a section fit the person's rules (`check`, returns `{ fits, why }`), time formatting, and backup alerts (`backupNotice`). |
 | `src/schedule.mjs` | Builds clash-free weekly schedules from open sections and ranks them (`buildSchedules`, `score`). |
 | `src/core.mjs` | One check: fetch every course, mark fits, compare with the last check, alert. Holds the live `status` the dashboard reads. |
-| `src/server.mjs` | The dashboard's HTTP server and JSON API (`/api/state`, `/api/schedules`, `/api/config`, `/api/setup`, `/api/course`, `/api/terms`, `/api/check`, `/api/test-alert`). |
+| `src/server.mjs` | The dashboard's HTTP server and JSON API (`/api/state`, `/api/week`, `/api/schedules`, `/api/lookup`, `/api/held`, `/api/import`, `/api/finder`, `/api/history`, `/api/config`, `/api/setup`, `/api/course`, `/api/terms`, `/api/check`, `/api/test-alert`). Rejects requests whose Origin is another website. |
 | `src/notify.mjs` | Alerts: Windows toast (PowerShell), Mac notification (osascript), Linux notify-send, ntfy, Discord webhook. |
 | `src/service.mjs` | Start at login: Windows Task Scheduler task "UGA Seat Watcher" (runs `scripts/run-windows.ps1`), Mac launchd agent `com.ugaseatwatcher.agent`. |
 | `src/config.mjs` | Defaults, `validate` (every saved config goes through it), load and save. |
-| `src/paths.mjs` | Where the log and state live (`%LOCALAPPDATA%\uga-seat-watcher` or `~/Library/Application Support/uga-seat-watcher`), plus `log`. |
+| `src/paths.mjs` | Where the log, state, seat history (`history.jsonl`) and term cache live (`%LOCALAPPDATA%\uga-seat-watcher` or `~/Library/Application Support/uga-seat-watcher`), plus `log`. |
 | `web/index.html` | The whole dashboard and setup wizard: one file, vanilla JS, no framework. |
 | `test/` | Offline tests (`npm test`). They never touch the network. |
 
@@ -39,10 +50,11 @@ before you say something works.
 Everything downstream uses what `toSection` returns:
 
 ```js
-{ crn: '73893', course: 'RMIN 4000', title, credits,
+{ crn: '73893', course: 'RMIN 4000', title, credits, subject, number, campus, part_of_term,
   meetings: [{ days: 'MW', begin: '1135', end: '1250', building, room }],
   days, begin, end,          // first meeting, for quick display
-  online,                    // no set time, or Athena says online
+  online,                    // no set time on the grid (online, or time TBA)
+  remote,                    // Athena actually says it's online (use this for "online classes")
   instructor,
   seats,                     // REAL open seats: 0 while anyone is waiting, else seatsAvailable
   raw_seats, waiting, max }
@@ -79,11 +91,24 @@ Days use Banner letters: M T W R(Thursday) F S U. Times are `'HHMM'` strings, co
    ("take a backup", "running low", "completely full").
 9. **In the dashboard, never return `false` from an `onkeydown` handler** for keys you don't handle.
    That cancels typing. (It shipped once.)
+10. **Athena sometimes answers a search with nothing** mid-session. A course that had sections
+    doesn't vanish between checks, so `runCheck` retries once on a fresh session and otherwise keeps
+    the last good data (`stale: true`). Never treat an empty answer as "full everywhere".
+11. **Switching sections is add-and-drop in one submit.** Advice must never tell someone to drop
+    first, and must say when the old section has people waiting (the seat goes to them). One
+    waitlist per course, and not while registered in another section of it. A waitlist seat means an
+    email and about 18 hours to register.
+12. **Rule presets start off.** No 8am, Friday or any other rule is on until the student picks it
+    (the setup wizard once defaulted to 9:00, which quietly hid every 8am).
+13. **The extension reads Athena's tables by column header text** (CRN, Status, Action, Details,
+    Subject, Course Number), because Athena's markup isn't documented. Test changes against a copy
+    of the page; it can't be tested against the real one without logging in.
 
 ## Commands
 
 ```
 npm test                          offline tests, run these after any change to src/
+node mcp.mjs                      the MCP server (Claude starts it; talks to the running app)
 node watcher.mjs --open           start, open the dashboard (setup first time)
 node watcher.mjs --once           one check, printed, no alerts
 node watcher.mjs find BUSN 4000   every section of a course
@@ -113,6 +138,13 @@ To try changes without touching the person's real setup, copy the folder somewhe
   `node watcher.mjs find SUBJ 1234` first.
 - **Dashboard look:** colors are CSS variables at the top of `web/index.html`. Bright rows are open,
   faded rows (`.row.full`) are full; only full sections should be faded.
+- **A new term:** add its dates to `src/dates.mjs` (from the registrar's calendar) so Home counts
+  down to them.
+- **A new advice case:** add it to `advise()` in `src/advice.mjs` with plain steps in Athena's own
+  words, and a test in `test/advice.test.mjs`. The dashboard, MCP server and extension all show
+  `moves` as they are, so there's nothing else to change.
+- **A new MCP tool:** add an entry to `TOOLS` in `mcp.mjs` that calls a dashboard endpoint. Keep the
+  answers small (see `slimSection`).
 
 ## Don'ts
 

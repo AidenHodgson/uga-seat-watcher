@@ -14,17 +14,17 @@ const rules = { earliest: '', latest: '', skip_days: 'F', preferred_days: '', av
 const mark = (courses, config) =>
   courses.map((c) => ({ ...c, ok: true, sections: c.sections.map((s) => ({ ...s, ...check(s, config.courses.find((x) => x.course === c.course) ?? {}, config.rules) })) }));
 
-// Nov 19, 2026, after the RMIN mixup: registered in BUSN and COMM, waitlisted for RMIN 73939.
+// A student registered in BUSN and COMM, on the RMIN 41003 waitlist, with two better lines open.
 const term = [
-  { course: 'BUSN 4000', sections: [S('BUSN 4000', '35339', 'TR', '0815', '0935', 34, 8, 'Correll Hall')] },
-  { course: 'COMM 1500', sections: [S('COMM 1500', '77095', 'TR', '0955', '1115', 29, 0, 'Park Hall')] },
+  { course: 'BUSN 4000', sections: [S('BUSN 4000', '41001', 'TR', '0815', '0935', 34, 8, 'Correll Hall')] },
+  { course: 'COMM 1500', sections: [S('COMM 1500', '41002', 'TR', '0955', '1115', 29, 0, 'Park Hall')] },
   {
     course: 'RMIN 4000',
     sections: [
-      S('RMIN 4000', '73939', 'MWF', '1315', '1410', 1, 4),
-      S('RMIN 4000', '22779', 'TR', '1135', '1255', 17, 16),
-      S('RMIN 4000', '73893', 'MW', '1135', '1255', 14, 13),
-      S('RMIN 4000', '64146', 'WF', '0815', '0935', 26, 0),
+      S('RMIN 4000', '41003', 'MWF', '1315', '1410', 1, 4),
+      S('RMIN 4000', '41004', 'TR', '1135', '1255', 17, 16),
+      S('RMIN 4000', '41005', 'MW', '1135', '1255', 14, 13),
+      S('RMIN 4000', '41006', 'WF', '0815', '0935', 26, 0),
     ],
   },
 ];
@@ -41,9 +41,9 @@ test('waitlisted with a clearly better line: says to move the spot, with safe st
   const config = {
     rules,
     courses: [
-      { course: 'BUSN 4000', enabled: false, targets: [], registered: '35339', waitlisted: '' },
-      { course: 'COMM 1500', enabled: false, targets: [], registered: '77095', waitlisted: '' },
-      { course: 'RMIN 4000', enabled: true, targets: [], registered: '', waitlisted: '73939' },
+      { course: 'BUSN 4000', enabled: false, targets: [], registered: '41001', waitlisted: '' },
+      { course: 'COMM 1500', enabled: false, targets: [], registered: '41002', waitlisted: '' },
+      { course: 'RMIN 4000', enabled: true, targets: [], registered: '', waitlisted: '41003' },
     ],
   };
   const { week, moves } = advise(mark(term, config), config);
@@ -51,28 +51,28 @@ test('waitlisted with a clearly better line: says to move the spot, with safe st
   assert.equal(week.picks[0].waitlisted, true);
   const rmin = moves.find((m) => m.course === 'RMIN 4000');
   assert.equal(rmin.kind, 'switch-waitlist');
-  assert.deepEqual(rmin.crns, ['22779']); // 73893 is just as likely; ties keep Athena's order
+  assert.deepEqual(rmin.crns, ['41004']); // 41005 is just as likely; ties keep Athena's order
   assert.match(rmin.why, /one waitlist per course/);
-  assert.match(rmin.steps.at(-1), /re-add 73939/);
-  // 64146 is open, but meets Friday at 8:15, so it isn't offered as a register move.
-  assert.ok(!moves.some((m) => m.crns.includes('64146')));
+  assert.match(rmin.steps.at(-1), /re-add 41003/);
+  // 41006 is open, but meets Friday at 8:15, so it isn't offered as a register move.
+  assert.ok(!moves.some((m) => m.crns.includes('41006')));
 });
 
 test('no seat yet and a section is truly open: register now', () => {
   const config = { rules: { ...rules, skip_days: '' }, courses: [{ course: 'RMIN 4000', enabled: true, targets: [], registered: '', waitlisted: '' }] };
   const { moves } = advise(mark([term[2]], config), config);
   assert.equal(moves[0].kind, 'register');
-  assert.deepEqual(moves[0].crns, ['64146']);
+  assert.deepEqual(moves[0].crns, ['41006']);
 });
 
 test('registered with a better open section: one-submit swap, and never drop first when people wait', () => {
-  const busn = { course: 'BUSN 4000', sections: [S('BUSN 4000', '35339', 'TR', '0815', '0935', 0, 3), S('BUSN 4000', '20743', 'MW', '1135', '1255', 5, 0)] };
-  const config = { rules: { ...rules, earliest: '09:00' }, courses: [{ course: 'BUSN 4000', enabled: true, targets: [], registered: '35339', waitlisted: '' }] };
+  const busn = { course: 'BUSN 4000', sections: [S('BUSN 4000', '41001', 'TR', '0815', '0935', 0, 3), S('BUSN 4000', '20743', 'MW', '1135', '1255', 5, 0)] };
+  const config = { rules: { ...rules, earliest: '09:00' }, courses: [{ course: 'BUSN 4000', enabled: true, targets: [], registered: '41001', waitlisted: '' }] };
   const { moves } = advise(mark([busn], config), config);
   assert.equal(moves[0].kind, 'swap');
-  assert.equal(moves[0].drop, '35339');
+  assert.equal(moves[0].drop, '41001');
   assert.match(moves[0].steps.join(' '), /Click Submit once/);
-  assert.match(moves[0].steps.at(-1), /Never drop 35339 on its own first/);
+  assert.match(moves[0].steps.at(-1), /Never drop 41001 on its own first/);
 });
 
 test('tight walks: east campus to north campus with 20 minutes to spare is tight', () => {

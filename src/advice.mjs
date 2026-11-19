@@ -196,8 +196,8 @@ export function advise(courses, config) {
       moves.push({
         course: c.course,
         kind: 'join-waitlist',
-        urgency: 1,
-        title: `Join the ${c.course} waitlist for ${label(s)} (CRN ${s.crn})`,
+        urgency: odds.level === 'likely' ? 1 : 2,
+        title: `${odds.level === 'likely' ? 'Join' : 'Long shot: join'} the ${c.course} waitlist for ${label(s)} (CRN ${s.crn})`,
         why: `${odds.text}. You can only be on one waitlist per course, so pick the best line.`,
         steps: [
           `Enter CRNs: add ${s.crn}, Add to Summary, Submit. You'll get "Seat(s) Reserved for Waitlist".`,
