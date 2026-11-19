@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "UGA Seat Watcher",
+  "version": "1.0.0",
+  "description": "Highlights sections in Athena that fit your week, reads your schedule into Seat Watcher, and warns before a risky drop. Never clicks Submit.",
+  "permissions": ["storage"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://athena-prod.uga.edu/StudentRegistrationSsb/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_title": "UGA Seat Watcher", "default_popup": "popup.html" },
+  "icons": { "48": "icon48.png", "128": "icon128.png" }
+}

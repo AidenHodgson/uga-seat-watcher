@@ -1,0 +1,28 @@
+/* Seat Watcher marks on Athena's tables, kept small so Athena's own layout still works. */
+tr.sw-fit > td:first-child { box-shadow: inset 4px 0 0 #2e9e5b; }
+tr.sw-fit { background: #eefaf2 !important; }
+tr.sw-wait > td:first-child { box-shadow: inset 4px 0 0 #d8960b; }
+tr.sw-wait { background: #fff8e6 !important; }
+tr.sw-full { opacity: 0.45; }
+tr.sw-nofit > td:first-child { box-shadow: inset 4px 0 0 #c9c9c9; }
+tr.sw-yours > td:first-child { box-shadow: inset 4px 0 0 #2f6fd6; }
+.sw-badge { display: inline-block; margin: 3px 0 0; padding: 1px 7px; border-radius: 999px; font: 600 11px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif; background: #e7f6ec; color: #1d6b3b; white-space: nowrap; }
+.sw-badge.wait { background: #fff1cc; color: #7a5300; }
+.sw-badge.full { background: #eee; color: #555; }
+.sw-badge.nofit { background: #f1f1f1; color: #555; }
+.sw-badge.yours { background: #e3edff; color: #1f4fa3; }
+.sw-badge.re { background: #efe9ff; color: #4b2f9e; }
+.sw-warn { margin: 8px; padding: 10px 12px; border-radius: 10px; background: #fff1f0; border: 1px solid #f1b5ae; color: #8a1c10; font: 13px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+.sw-warn.ok { background: #eefaf2; border-color: #a9dcbc; color: #1d6b3b; }
+.sw-warn b { display: block; margin-bottom: 2px; }
+#sw-panel { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000; width: 300px; background: #14161a; color: #eef0f3; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.35); font: 13px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+#sw-panel header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #1c1f25; cursor: pointer; font-weight: 700; }
+#sw-panel header i { width: 9px; height: 9px; border-radius: 50%; background: #ba0c2f; }
+#sw-panel header span { margin-left: auto; color: #8b929e; font-weight: 400; font-size: 12px; }
+#sw-panel .body { padding: 10px 12px 12px; }
+#sw-panel.min .body { display: none; }
+#sw-panel p { margin: 0 0 6px; color: #c3c8d1; }
+#sw-panel b { color: #eef0f3; }
+#sw-panel button { background: #ba0c2f; color: #fff; border: 0; border-radius: 999px; padding: 6px 12px; font: 600 12.5px inherit; cursor: pointer; margin: 4px 6px 0 0; }
+#sw-panel button.alt { background: #2e333d; }
+#sw-panel .muted { color: #8b929e; font-size: 12px; }
