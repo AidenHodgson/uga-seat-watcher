@@ -20,19 +20,20 @@ export function waitlistOdds(s, { onIt = false } = {}) {
   if (!s.waiting) return null;
   const position = onIt ? s.waiting : s.waiting + 1;
   const seats = s.raw_seats ?? 0;
+  const n = (k) => `${k} seat${k === 1 ? '' : 's'}`;
   let level;
   let text;
   if (seats >= position) {
     level = 'likely';
     text = onIt
-      ? `${s.waiting} on the list including you, ${seats} seats open: everyone on it should get in`
-      : `You'd be #${position} for ${seats} open seats: likely`;
+      ? `${s.waiting} on the list including you, ${n(seats)} open: everyone on it should get in`
+      : `You'd be #${position} for ${n(seats)} open: likely`;
   } else if (seats > 0) {
     level = 'maybe';
     const need = position - seats;
     text = onIt
-      ? `${s.waiting} on the list including you, ${seats} seats open: needs about ${need} more ${need === 1 ? 'drop' : 'drops'}`
-      : `You'd be #${position}, ${seats} seats open: needs ${need} more ${need === 1 ? 'drop' : 'drops'}`;
+      ? `${s.waiting} on the list including you, ${n(seats)} open: needs about ${need} more ${need === 1 ? 'drop' : 'drops'}`
+      : `You'd be #${position}, ${n(seats)} open: needs ${need} more ${need === 1 ? 'drop' : 'drops'}`;
   } else {
     level = 'long';
     text = onIt ? `${s.waiting} on the list including you, no seats open yet` : `You'd be #${position} and it's full: a long shot`;

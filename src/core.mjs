@@ -68,10 +68,26 @@ export function runCheck({ alerts = true } = {}) {
         for (const c of watch) {
           const [subject, number] = c.course.split(' ');
           try {
-            const sections = (await athena.course(subject, number)).map((s) => ({ ...s, ...check(s, c, config.rules) }));
-            courses.push({ course: c.course, ok: true, alerts: c.enabled !== false, targeted: !!(c.targets?.length || c.registered || c.waitlisted), sections });
+            let found = await athena.course(subject, number);
+            // Athena sometimes answers a search with nothing mid-session. A course that had sections
+            // doesn't vanish between checks, so retry once on a fresh session, then keep the last
+            // good data rather than reporting it "full everywhere".
+            const before = status.courses.find((x) => x.course === c.course && x.ok && x.sections.length);
+            if (!found.length && before) {
+              await sleep(2000);
+              await athena.start();
+              found = await athena.course(subject, number);
+            }
+            if (!found.length && before) {
+              courses.push({ ...before, ok: true, stale: true });
+              log(`${c.course}: Athena returned no sections twice; keeping the last check`);
+            } else {
+              const sections = found.map((s) => ({ ...s, ...check(s, c, config.rules) }));
+              courses.push({ course: c.course, ok: true, alerts: c.enabled !== false, targeted: !!(c.targets?.length || c.registered || c.waitlisted), sections });
+            }
           } catch (e) {
-            courses.push({ course: c.course, ok: false, error: e.message });
+            const before = status.courses.find((x) => x.course === c.course && x.ok);
+            courses.push(before ? { ...before, stale: true, error: e.message } : { course: c.course, ok: false, error: e.message });
           }
           await sleep(1200); // be polite between courses
         }
@@ -140,7 +156,7 @@ async function compare(courses, config, alerts) {
   const changes = [];
   const at = new Date().toISOString();
   for (const c of courses) {
-    if (!c.ok) continue;
+    if (!c.ok || c.stale) continue;
     for (const s of c.sections) {
       const before = prev[s.crn];
       if (before && before.seats <= 0 && s.seats > 0 && s.fits && c.alerts) opened.push(s);

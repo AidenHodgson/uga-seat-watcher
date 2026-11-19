@@ -32,7 +32,7 @@ const term = [
 test('waitlist odds: more seats than people waiting is likely, not open', () => {
   const s = term[2].sections[1];
   assert.equal(s.seats, 0); // held for the waitlist
-  assert.deepEqual(waitlistOdds(s), { position: 17, seats: 17, level: 'likely', text: "You'd be #17 for 17 open seats: likely" });
+  assert.deepEqual(waitlistOdds(s), { position: 17, seats: 17, level: 'likely', text: "You'd be #17 for 17 seats open: likely" });
   assert.equal(waitlistOdds(term[2].sections[0]).level, 'maybe');
   assert.equal(waitlistOdds(term[2].sections[3]), null); // nobody waiting, no waitlist talk
 });
