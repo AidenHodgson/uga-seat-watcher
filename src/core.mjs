@@ -3,7 +3,8 @@
 import { Athena } from './athena.mjs';
 import { loadConfig } from './config.mjs';
 import { notify } from './notify.mjs';
-import { STATE, log, readJson, writeJson } from './paths.mjs';
+import fs from 'node:fs';
+import { HISTORY, STATE, log, readJson, writeJson } from './paths.mjs';
 import { backupNotice, check, label } from './rules.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -58,7 +59,8 @@ export function runCheck({ alerts = true } = {}) {
     status.checking = true;
     const config = loadConfig();
     const courses = [];
-    const watch = config.courses.filter((c) => c.enabled !== false);
+    // Alerts-on courses, plus courses you hold a seat or waitlist spot in (your week needs their times).
+    const watch = config.courses.filter((c) => c.enabled !== false || c.registered || c.waitlisted);
     if (config.term && watch.length) {
       const athena = new Athena(config.school.athena, config.term);
       try {
@@ -67,7 +69,7 @@ export function runCheck({ alerts = true } = {}) {
           const [subject, number] = c.course.split(' ');
           try {
             const sections = (await athena.course(subject, number)).map((s) => ({ ...s, ...check(s, c, config.rules) }));
-            courses.push({ course: c.course, ok: true, targeted: !!c.targets?.length, sections });
+            courses.push({ course: c.course, ok: true, alerts: c.enabled !== false, targeted: !!(c.targets?.length || c.registered || c.waitlisted), sections });
           } catch (e) {
             courses.push({ course: c.course, ok: false, error: e.message });
           }
@@ -92,24 +94,78 @@ export function runCheck({ alerts = true } = {}) {
   return running;
 }
 
+/**
+ * Seat history for one section: { ever_full, opened_at, filled_at, opens }, or undefined if it has
+ * never been seen. `ever_full` means it had no open seat at some check since watching started.
+ */
+export function history(crn, state = readJson(STATE, { sections: {} })) {
+  return state.sections?.[crn];
+}
+
+function appendHistory(rows) {
+  if (!rows.length) return;
+  try {
+    fs.appendFileSync(HISTORY, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+    if (fs.statSync(HISTORY).size > 2_000_000) {
+      const lines = fs.readFileSync(HISTORY, 'utf8').trim().split('\n');
+      fs.writeFileSync(HISTORY, lines.slice(-5000).join('\n') + '\n');
+    }
+  } catch {
+    // history is a nice-to-have; never stop a check over it
+  }
+}
+
+/** Recent seat changes, newest first. `crns` narrows it. */
+export function recentHistory({ crns, limit = 200 } = {}) {
+  try {
+    const want = crns ? new Set(crns) : null;
+    return fs
+      .readFileSync(HISTORY, 'utf8')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l))
+      .filter((r) => !want || want.has(r.crn))
+      .slice(-limit)
+      .reverse();
+  } catch {
+    return [];
+  }
+}
+
 async function compare(courses, config, alerts) {
   const state = readJson(STATE, { sections: {} });
   const prev = state.sections;
   const opened = [];
   const notices = [];
+  const changes = [];
+  const at = new Date().toISOString();
   for (const c of courses) {
     if (!c.ok) continue;
     for (const s of c.sections) {
       const before = prev[s.crn];
-      if (before && before.seats <= 0 && s.seats > 0 && s.fits) opened.push(s);
+      if (before && before.seats <= 0 && s.seats > 0 && s.fits && c.alerts) opened.push(s);
     }
     const before = Object.values(prev).filter((p) => p.course === c.course);
-    const n = c.targeted ? null : backupNotice(c.course, before, c.sections);
+    const n = c.targeted || !c.alerts ? null : backupNotice(c.course, before, c.sections);
     if (n) notices.push(n);
-    for (const [crn, v] of Object.entries(prev)) if (v.course === c.course) delete prev[crn];
-    for (const s of c.sections) prev[s.crn] = { course: c.course, seats: s.seats, fits: s.fits };
+    const seen = new Set(c.sections.map((s) => s.crn));
+    for (const [crn, v] of Object.entries(prev)) if (v.course === c.course && !seen.has(crn)) delete prev[crn];
+    for (const s of c.sections) {
+      const b = prev[s.crn];
+      const next = { course: c.course, seats: s.seats, fits: s.fits, ever_full: b ? b.ever_full || s.seats <= 0 : s.seats <= 0, opened_at: b?.opened_at ?? null, filled_at: b?.filled_at ?? null, opens: b?.opens ?? 0 };
+      if (b && b.seats <= 0 && s.seats > 0) {
+        next.opened_at = at;
+        next.opens += 1;
+        changes.push({ at, crn: s.crn, course: c.course, kind: 'opened', seats: s.seats, waiting: s.waiting });
+      } else if (b && b.seats > 0 && s.seats <= 0) {
+        next.filled_at = at;
+        changes.push({ at, crn: s.crn, course: c.course, kind: 'filled', seats: s.seats, waiting: s.waiting });
+      }
+      prev[s.crn] = next;
+    }
   }
   writeJson(STATE, state);
+  appendHistory(changes);
   if (!alerts) return;
   const url = `http://127.0.0.1:${config.port}`;
   if (opened.length) {

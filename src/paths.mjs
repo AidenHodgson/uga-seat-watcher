@@ -17,6 +17,10 @@ fs.mkdirSync(DATA, { recursive: true });
 
 export const STATE = path.join(DATA, 'state.json');
 export const LOG = path.join(DATA, 'watcher.log');
+/** One line per seat change (opened or filled), for seat history. */
+export const HISTORY = path.join(DATA, 'history.jsonl');
+/** Every section of a term, for the elective finder. */
+export const termCache = (term) => path.join(DATA, `term-${term}.json`);
 
 export const readJson = (p, fallback) => {
   try {

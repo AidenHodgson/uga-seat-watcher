@@ -11,19 +11,24 @@ const MAX_NODES = 400_000;
 
 const mins = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(2));
 
-function slotsFor(course, sections, strict) {
-  const usable = sections.filter((s) => s.seats > 0 && !s.online && s.begin && (!strict || s.fits));
+// `held` is the CRN you're registered in (or waitlisted for): it's always usable, seats or not,
+// because it's yours. Its slot is marked `current`.
+function slotsFor(course, sections, strict, held = '') {
+  const usable = sections.filter((s) => s.crn === held || (s.seats > 0 && !s.online && s.begin && (!strict || s.fits)));
   const bySlot = new Map();
   for (const s of usable) {
+    if (!s.begin) continue;
     const key = s.meetings.map((m) => `${m.days}${m.begin}-${m.end}`).sort().join('|');
-    if (!bySlot.has(key)) bySlot.set(key, { course, key, meetings: s.meetings, sections: [] });
-    bySlot.get(key).sections.push(s);
+    if (!bySlot.has(key)) bySlot.set(key, { course, key, meetings: s.meetings, sections: [], current: false });
+    const slot = bySlot.get(key);
+    slot.sections.push(s);
+    if (s.crn === held) slot.current = true;
   }
-  for (const slot of bySlot.values()) slot.sections.sort((a, b) => b.seats - a.seats);
+  for (const slot of bySlot.values()) slot.sections.sort((a, b) => (a.crn === held ? -1 : b.crn === held ? 1 : b.seats - a.seats));
   return [...bySlot.values()];
 }
 
-function clash(a, b) {
+export function clash(a, b) {
   return a.meetings.some((x) => b.meetings.some((y) => [...x.days].some((d) => y.days.includes(d)) && x.begin < y.end && y.begin < x.end));
 }
 
@@ -49,7 +54,7 @@ export function describe(picks, rules) {
   const offPreferred = preferred ? picks.filter((p) => p.meetings.some((m) => [...m.days].some((d) => !preferred.includes(d)))).length : 0;
   const early = days.filter((d) => byDay[d].some((m) => m.begin < '0930')).length;
   const late = days.filter((d) => byDay[d].some((m) => m.end > '1700')).length;
-  const thin = picks.filter((p) => p.sections[0].seats <= 3).length;
+  const thin = picks.filter((p) => !p.current && p.sections[0].seats <= 3).length;
   return { days, earliest, latest, gapMins, offPreferred, early, late, thin };
 }
 
@@ -72,7 +77,7 @@ export function summary(f) {
  * ones are left out.
  */
 export function buildSchedules(courses, rules, { strict = true, limit = 8 } = {}) {
-  const options = courses.map((c) => ({ course: c.course, slots: slotsFor(c.course, c.sections, strict) }));
+  const options = courses.map((c) => ({ course: c.course, slots: slotsFor(c.course, c.sections, strict, c.held) }));
   const order = [...options].sort((a, b) => a.slots.length - b.slots.length);
   const results = [];
   let bestCount = 0;
@@ -104,7 +109,7 @@ export function buildSchedules(courses, rules, { strict = true, limit = 8 } = {}
     .filter((picks) => picks.length) // nothing placed at all is not a schedule
     .map((picks) => {
       const f = describe(picks, rules);
-      return { score: Math.round(score(f) * 10) / 10, summary: summary(f), picks: sortPicks(picks), facts: f };
+      return { score: Math.round(score(f) * 10) / 10, summary: summary(f), picks: sortPicks(picks), facts: f, changes: picks.filter((p) => !p.current).length };
     })
     .sort((a, b) => a.score - b.score);
 
@@ -128,7 +133,7 @@ export function buildSchedules(courses, rules, { strict = true, limit = 8 } = {}
   };
 }
 
-function sortPicks(picks) {
+export function sortPicks(picks) {
   const first = (p) => {
     const m = p.meetings[0];
     return `${WEEK.indexOf(m.days[0])}${m.begin}`;

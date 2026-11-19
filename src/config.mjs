@@ -24,7 +24,10 @@ export const DEFAULTS = {
     avoid_times: [], // extra windows like "TR 13:00-14:30"
     allow_online: true,
   },
-  courses: [], // { course: "BUSN 4000", enabled: true, targets: [] }
+  // { course: "BUSN 4000", enabled: true (alerts on), targets: [], registered: "35339", waitlisted: "" }
+  // `registered` is the section you're in; `waitlisted` the one you're on the waitlist for. Courses
+  // you hold a seat in are checked even with alerts off, so your week stays current.
+  courses: [],
   alerts: { desktop: true, ntfy_topic: '', discord_webhook: '' },
   // Not 4823, so it never collides with the Basecamp seat watcher on the same laptop.
   port: 4830,
@@ -79,7 +82,21 @@ export function validate(input) {
     seen.add(name);
     const targets = (x.targets ?? []).map((t) => String(t).trim()).filter(Boolean);
     if (targets.some((t) => !/^\d{5}$/.test(t))) throw new Error(`${name}: CRNs are five digits.`);
-    return { course: name, enabled: x.enabled !== false, targets, ...(x.allow_online === false ? { allow_online: false } : {}) };
+    const crn = (v, what) => {
+      const t = String(v ?? '').trim();
+      if (t && !/^\d{5}$/.test(t)) throw new Error(`${name}: the ${what} CRN should be five digits.`);
+      return t;
+    };
+    const registered = crn(x.registered, 'registered');
+    const waitlisted = crn(x.waitlisted, 'waitlisted');
+    return {
+      course: name,
+      enabled: x.enabled !== false,
+      targets,
+      registered,
+      waitlisted: waitlisted === registered ? '' : waitlisted,
+      ...(x.allow_online === false ? { allow_online: false } : {}),
+    };
   });
   if (c.courses.length > 15) throw new Error('Watch at most 15 courses.');
   if (c.alerts.ntfy_topic && !/^[\w-]{6,64}$/.test(c.alerts.ntfy_topic)) throw new Error('The ntfy topic can only use letters, numbers, - and _ (6 to 64 characters).');

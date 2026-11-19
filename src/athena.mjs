@@ -108,6 +108,10 @@ export class Athena {
   }
 }
 
+/** Athena sends some text HTML-escaped ("Boyd Research &amp;amp; Education"). */
+export const plain = (v) =>
+  v == null ? v : String(v).replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+
 export function toSection(c) {
   const meetings = (c.meetingsFaculty ?? []).map((m) => m.meetingTime ?? {}).filter((m) => m.beginTime);
   const daysOf = (m) => DAY_KEYS.filter(([k]) => m[k]).map(([, l]) => l).join('');
@@ -120,20 +124,27 @@ export function toSection(c) {
   return {
     crn: String(c.courseReferenceNumber),
     course: `${c.subject} ${c.courseNumber}`,
-    title: c.courseTitle ?? '',
+    title: plain(c.courseTitle ?? ''),
     credits: c.creditHourLow ?? c.creditHours ?? null,
+    subject: c.subject,
+    number: c.courseNumber,
+    campus: plain(c.campusDescription ?? null),
+    part_of_term: c.partOfTerm ?? null,
     meetings: meetings.map((m) => ({
       days: daysOf(m),
       begin: m.beginTime,
       end: m.endTime ?? m.beginTime,
-      building: m.buildingDescription ?? null,
+      building: plain(m.buildingDescription ?? null),
       room: m.room ?? null,
     })),
     days: m0 ? daysOf(m0) : '',
     begin: m0?.beginTime ?? null,
     end: m0?.endTime ?? null,
+    // `online` means no set time on the grid (a schedule can't place it). `remote` means Athena
+    // actually says it's online; a section with no time that isn't remote is "time TBA".
     online: !m0 || /online|web|virtual|distance|ecore/i.test(where),
-    instructor: (c.faculty ?? []).map((f) => f.displayName).filter(Boolean).join(', ') || null,
+    remote: /online|web|virtual|distance|ecore/i.test(where),
+    instructor: (c.faculty ?? []).map((f) => plain(f.displayName)).filter(Boolean).join(', ') || null,
     // While anyone is on the waitlist, Athena holds every open seat for the waitlist ("Seat(s)
     // Reserved for Waitlist"), even when there are more seats than people waiting. A seat is only
     // open to a new student when nobody is waiting.
