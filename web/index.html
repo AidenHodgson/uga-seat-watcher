@@ -29,7 +29,7 @@ button.btn:disabled{opacity:.5;cursor:default}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px}
 .card h2{margin:0;font-size:17px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .card h2 small{color:var(--quiet);font-weight:400;font-size:13px}
-.row{display:grid;grid-template-columns:150px 1fr 120px 150px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;margin-top:6px;border-left:3px solid transparent;background:var(--panel2)}
+.row{display:grid;grid-template-columns:240px 1fr 120px 150px;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;margin-top:6px;border-left:3px solid transparent;background:var(--panel2)}
 .row.full{opacity:.38;background:transparent}
 .row.fit{border-left-color:var(--green)}
 .row.nofit{border-left-color:var(--amber)}
@@ -92,6 +92,31 @@ input[type=text],input[type=number],select{background:var(--panel2);color:var(--
 .err{color:#ff8a8a;margin-top:8px}
 .big{font-size:18px;font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);padding:10px 14px;border-radius:10px;display:inline-block;margin:6px 0;user-select:all}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:999px;display:none}
+.presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.preset{border:1px solid var(--line);background:var(--panel2);color:var(--soft);border-radius:999px;padding:6px 12px;cursor:pointer;font:600 13px inherit;user-select:none}
+.preset.on{background:#3a1820;border-color:var(--red);color:#fff}
+.preset.on::before{content:"\2713  "}
+.move{background:var(--panel2);border-radius:12px;padding:12px 14px;margin-top:10px;border-left:3px solid var(--blue)}
+.move.k0{border-left-color:var(--green)}.move.k2{border-left-color:var(--faint)}
+.move b{display:block;font-size:15px}
+.move p{margin:4px 0 0;color:var(--soft);font-size:14px}
+.move ol{margin:8px 0 0;padding-left:20px;color:var(--soft);font-size:13.5px}
+.move ol li{margin:2px 0}
+.datechips{display:flex;gap:8px;flex-wrap:wrap}
+.date{background:var(--panel2);border-radius:12px;padding:8px 12px}
+.date b{font-size:20px;display:block}.date small{color:var(--quiet)}
+.block.wl{background:transparent!important;border:2px dashed currentColor}
+.mine{display:inline-flex;gap:4px;margin-top:4px}
+.mine button{white-space:nowrap;background:var(--panel);border:1px solid var(--line);color:var(--quiet);border-radius:999px;padding:2px 8px;font:600 11.5px inherit;cursor:pointer}
+.mine button.on{background:#1f2a3d;border-color:var(--blue);color:var(--blue)}
+.chip.blue{background:#1f2a3d;color:var(--blue)}
+.chip.grey{background:var(--panel2);color:var(--soft)}
+.warn{color:var(--amber);font-size:13.5px;margin-top:6px}
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:760px){.fgrid{grid-template-columns:1fr}}
+.result{border-top:1px solid var(--line);padding:10px 0}
+.result:first-child{border-top:0}
+.result .sec{display:flex;gap:12px;flex-wrap:wrap;font-size:14px;color:var(--soft);margin-top:4px;align-items:baseline}
 </style>
 </head>
 <body>
@@ -105,14 +130,18 @@ input[type=text],input[type=number],select{background:var(--panel2);color:var(--
     <button class="btn" id="reg">Open Athena</button>
   </div>
   <div class="tabs">
-    <button class="tab on" data-tab="seats">Seats</button>
+    <button class="tab on" data-tab="home">Home</button>
+    <button class="tab" data-tab="seats">Seats</button>
     <button class="tab" data-tab="schedules">Schedules</button>
+    <button class="tab" data-tab="finder">Finder</button>
     <button class="tab" data-tab="settings">Settings</button>
   </div>
 </header>
 <main id="main">
-  <section id="seats"></section>
+  <section id="home"></section>
+  <section id="seats" hidden></section>
   <section id="schedules" hidden></section>
+  <section id="finder" hidden></section>
   <section id="settings" hidden></section>
 </main>
 <div class="toast" id="toast"></div>
@@ -147,7 +176,67 @@ async function load() {
   const term = S.config.term_name || S.config.term;
   $('#sub').textContent = `${term} · ${st.checking ? 'checking now' : `checked ${ago(st.last_check_at)}`}${st.last_error ? ` · problem: ${st.last_error}` : ''}`;
   renderSeats();
+  if (!$('#home').hidden) renderHome();
   if (!$('#settings').hidden && !$('#settings').dataset.ready) renderSettings();
+}
+
+// ---------- rule presets: one click on, one click off. None are on until you pick them. ----------
+const PRESETS = [
+  { label: 'No 8ams', on: (r) => !!r.earliest && r.earliest >= '09:00', set: (r, v) => (r.earliest = v ? '09:00' : '') },
+  { label: 'No Fridays', on: (r) => r.skip_days.includes('F'), set: (r, v) => (r.skip_days = r.skip_days.replace('F', '') + (v ? 'F' : '')) },
+  { label: 'Done by 5pm', on: (r) => !!r.latest && r.latest <= '17:00', set: (r, v) => (r.latest = v ? '17:00' : '') },
+  { label: 'No evening classes', on: (r) => !!r.latest && r.latest <= '18:00' && r.latest > '17:00', set: (r, v) => (r.latest = v ? '18:00' : '') },
+  { label: 'No online', on: (r) => r.allow_online === false, set: (r, v) => (r.allow_online = !v) },
+  { label: 'Prefer Mon/Wed', on: (r) => r.preferred_days === 'MW', set: (r, v) => (r.preferred_days = v ? 'MW' : '') },
+  { label: 'Prefer Tue/Thu', on: (r) => r.preferred_days === 'TR', set: (r, v) => (r.preferred_days = v ? 'TR' : '') },
+];
+const presetBar = (rules, attr = 'data-preset') => `<div class="presets">${PRESETS.map((p, i) => `<span class="preset ${p.on(rules) ? 'on' : ''}" ${attr}="${i}">${p.label}</span>`).join('')}</div>`;
+function wirePresets() {
+  document.querySelectorAll('[data-preset]').forEach((el) => (el.onclick = async () => {
+    const cfg = structuredClone(S.config);
+    const p = PRESETS[+el.dataset.preset];
+    p.set(cfg.rules, !p.on(cfg.rules));
+    await save(cfg, `${p.label} ${p.on(cfg.rules) ? 'on' : 'off'}`);
+    if (!$('#settings').hidden) { delete $('#settings').dataset.ready; renderSettings(); }
+  }));
+}
+
+async function setHeld(course, patch, msg) {
+  const r = await fetch('/api/held', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ course, ...patch }) });
+  const d = await r.json();
+  if (!r.ok) return toast(d.error);
+  toast(msg);
+  await load();
+}
+
+// ---------- home: your week and what to do next ----------
+async function renderHome() {
+  const r = await (await fetch('/api/week')).json();
+  const colors = Object.fromEntries(S.config.courses.map((c, i) => [c.course, COLORS[i % COLORS.length]]));
+  const w = r.week;
+  let html = '';
+  if (r.dates.length) {
+    html += `<div class="card"><h2>Coming up</h2><div class="datechips" style="margin-top:10px">${r.dates.map((d) => `<div class="date" title="${esc(d.tip)}"><b>${d.days_left === 0 ? 'Today' : d.days_left === 1 ? 'Tomorrow' : `${d.days_left} days`}</b><small>${esc(d.label)} · ${new Date(d.date + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</small></div>`).join('')}</div><p class="note">${esc(r.dates[0].tip)}</p></div>`;
+  }
+  html += `<div class="card"><h2>What to do next</h2>`;
+  if (!r.moves.length) html += `<p class="note">Nothing to do right now. ${w.picks.length ? "You're set unless something better opens; the watcher keeps checking." : ''}</p>`;
+  for (const m of r.moves) {
+    html += `<div class="move k${m.urgency}"><b>${esc(m.title)}</b><p>${esc(m.why)}</p>${m.steps.length ? `<ol>${m.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}${m.crns.length ? `<p class="note"><button class="btn alt" data-copy="${m.crns.join(', ')}">Copy CRN${m.crns.length > 1 ? 's' : ''}</button>&nbsp; Then open Athena's Enter CRNs tab.</p>` : ''}</div>`;
+  }
+  html += `</div>`;
+  html += `<div class="card"><h2>Your week <small>${esc(w.summary || 'Mark the sections you have on the Seats tab (or sync from Athena with the Chrome extension).')}</small></h2>`;
+  if (w.picks.length) html += grid(w.picks, colors);
+  for (const x of w.walks) html += `<p class="warn">${DAY[x.day]}: ${esc(x.from.course)} (${esc(x.from.building)}) to ${esc(x.to.course)} (${esc(x.to.building)}) is about a ${x.walk} minute walk with ${x.gap} minutes between. ${x.level === 'too far' ? "You likely won't make it on time." : 'Tight.'}</p>`;
+  if (w.picks.some((p) => p.waitlisted)) html += `<p class="note">Dashed means you're on the waitlist, not registered yet.</p>`;
+  if (w.online.length) html += `<p class="note">Online: ${w.online.map((p) => `${esc(p.course)} (CRN ${p.sections[0].crn})`).join(', ')}</p>`;
+  for (const n of w.notes) html += `<p class="warn">${esc(n)}</p>`;
+  html += `</div>`;
+  html += `<div class="card"><h2>Your rules <small>one click to turn on or off</small></h2><div style="margin-top:10px">${presetBar(S.config.rules)}</div></div>`;
+  const ev = S.status.events;
+  if (ev.length) html += `<div class="card"><h2>Recent alerts</h2>${ev.slice(0, 5).map((e) => `<div class="event"><b>${esc(e.title)}</b><span>${esc(e.body)} · ${ago(e.at)}</span></div>`).join('')}</div>`;
+  $('#home').innerHTML = html;
+  document.querySelectorAll('#home [data-copy]').forEach((el) => (el.onclick = () => copy(el.dataset.copy, 'CRN')));
+  wirePresets();
 }
 
 function renderSeats() {
@@ -155,9 +244,7 @@ function renderSeats() {
   const courseCfg = Object.fromEntries(S.config.courses.map((c) => [c.course, c]));
   let html = '';
   if (!S.config.courses.length) html += `<div class="banner">No courses yet. Add some in Settings.</div>`;
-  if (st.events.length) {
-    html += `<div class="card"><h2>Recent alerts</h2>${st.events.slice(0, 5).map((e) => `<div class="event"><b>${esc(e.title)}</b><span>${esc(e.body)} · ${ago(e.at)}</span></div>`).join('')}</div>`;
-  }
+  html += `<div class="card"><h2>Your rules <small>one click to turn on or off</small></h2><div style="margin-top:10px">${presetBar(S.config.rules)}</div></div>`;
   html += `<div class="toolbar"><label class="check"><input type="checkbox" id="onlyFits" ${onlyFits ? 'checked' : ''}> Only show sections that fit my rules</label><span class="note">Bright = seats open · faded = full · <span style="color:var(--green)">green edge</span> fits your rules · <span style="color:var(--amber)">amber edge</span> doesn't · click a CRN to copy it</span></div>`;
   for (const c of st.courses) {
     const cfg = courseCfg[c.course] ?? {};
@@ -167,20 +254,24 @@ function renderSeats() {
     const fitOpen = open.filter((s) => s.fits);
     const title = secs[0]?.title ?? '';
     let backup = '';
-    if (!c.targeted && secs.length && !fitOpen.length) {
+    if (!c.targeted && !cfg.registered && !cfg.waitlisted && secs.length && !fitOpen.length) {
       backup = open.length
         ? `<div class="banner">Nothing that fits your rules has a seat. Best backups: ${open.slice(0, 2).map((s) => `${when(s)} (CRN ${s.crn}, ${s.seats} open)`).join(' or ')}. A seat beats no seat; the watcher tells you if something better opens.</div>`
         : `<div class="banner">Every section is full. Join a waitlist in Athena if there is one.</div>`;
     }
-    const targetsNote = c.targeted ? `<p class="note">Switch mode: only alerting for CRN ${cfg.targets.join(', ')}. Tap ☆ to change.</p>` : `<p class="note">Already registered? Star (☆) the sections you'd switch to, and it only alerts for those.</p>`;
-    html += `<div class="card"><h2>${esc(c.course)} <small>${esc(title)} · ${open.length} of ${secs.length} sections have seats · ${fitOpen.length} fit your rules</small></h2>${targetsNote}${backup}`;
+    const targetsNote = c.targeted ? `<p class="note">Switch mode: only alerting for CRN ${cfg.targets.join(', ')}. Tap ☆ to change.</p>` : `<p class="note">Mark the section you're in (or waitlisted for) and Home tells you what to do next. Star (☆) sections you'd switch to and it only alerts for those.</p>`;
+    const alertsBtn = `<button class="btn alt" style="padding:4px 12px;font-size:12.5px" data-alerts="${esc(c.course)}" data-on="${c.alerts !== false ? 1 : 0}">${c.alerts !== false ? 'Alerts on' : 'Alerts off'}</button>`;
+    html += `<div class="card"><h2>${esc(c.course)} <small>${esc(title)} · ${open.length} of ${secs.length} sections have seats · ${fitOpen.length} fit your rules</small><span class="spacer"></span>${alertsBtn}</h2>${targetsNote}${backup}`;
     for (const s of secs) {
       if (onlyFits && !s.fits) continue;
       const isTarget = (cfg.targets ?? []).includes(s.crn);
       const chips = s.fits ? [`<span class="chip ok">${c.targeted ? 'switch target' : 'fits'}</span>`] : s.why.map((w) => `<span class="chip">${esc(w)}</span>`);
-      if (s.waiting) chips.push(`<span class="chip">${s.waiting} on waitlist</span>`);
-      html += `<div class="row ${s.seats > 0 ? '' : 'full'} ${s.fits ? 'fit' : 'nofit'}">
-        <div><div class="when">${esc(when(s))}</div><div class="chips">${chips.join('')}</div></div>
+      if (s.yours) chips.unshift(`<span class="chip blue">${s.yours === 'registered' ? "You're in this one" : "You're on its waitlist"}</span>`);
+      if (s.odds && s.yours !== 'registered') chips.push(`<span class="chip ${s.odds.level === 'likely' ? 'ok' : ''}" title="Athena holds every open seat for the waitlist while anyone is on it">${esc(s.odds.text)}</span>`);
+      if (s.reopened_at) chips.push(`<span class="chip grey" title="Opened ${s.opens} time${s.opens === 1 ? '' : 's'} since watching started">Reopened ${esc(when2(s.reopened_at))}</span>`);
+      const mine = `<div class="mine"><button class="${s.yours === 'registered' ? 'on' : ''}" data-held="registered" data-course="${esc(c.course)}" data-crn2="${s.crn}">I'm in this</button><button class="${s.yours === 'waitlisted' ? 'on' : ''}" data-held="waitlisted" data-course="${esc(c.course)}" data-crn2="${s.crn}">Waitlisted</button></div>`;
+      html += `<div class="row ${s.seats > 0 || s.yours ? '' : 'full'} ${s.fits ? 'fit' : 'nofit'}">
+        <div><div class="when">${esc(when(s))}</div><div class="chips">${chips.join('')}</div>${mine}</div>
         <div class="who">${rmp(s.instructor) || '<span class="note">Instructor TBA</span>'}${s.meetings[0]?.building ? `<div class="note" style="margin:0">${esc(s.meetings[0].building)} ${esc(s.meetings[0].room ?? '')}</div>` : ''}</div>
         <div><span class="crn" data-crn="${s.crn}">CRN ${s.crn}</span><button class="star ${isTarget ? 'on' : ''}" data-course="${esc(c.course)}" data-star="${s.crn}" title="Switch target">${isTarget ? '★' : '☆'}</button></div>
         <div class="seats ${s.seats > 0 ? 'open' : 'none'}">${s.seats > 0 ? `${s.seats} open` : 'Full'}<small>of ${s.max}${s.raw_seats > s.seats ? `, ${s.raw_seats} held for the waitlist` : ''}</small></div>
@@ -192,6 +283,21 @@ function renderSeats() {
   $('#onlyFits').onchange = (e) => { onlyFits = e.target.checked; renderSeats(); };
   document.querySelectorAll('[data-crn]').forEach((el) => (el.onclick = () => copy(el.dataset.crn, `CRN ${el.dataset.crn}`)));
   document.querySelectorAll('[data-star]').forEach((el) => (el.onclick = () => toggleTarget(el.dataset.course, el.dataset.star)));
+  document.querySelectorAll('[data-held]').forEach((el) => (el.onclick = () => {
+    const kind = el.dataset.held, course = el.dataset.course, crn = el.dataset.crn2;
+    const off = el.classList.contains('on');
+    setHeld(course, { [kind]: off ? '' : crn, ...(off ? {} : { [kind === 'registered' ? 'waitlisted' : 'registered']: '' }) }, off ? `${course}: cleared` : `${course}: ${kind === 'registered' ? "you're in" : "you're waitlisted for"} ${crn}`);
+  }));
+  document.querySelectorAll('[data-alerts]').forEach((el) => (el.onclick = () => setHeld(el.dataset.alerts, { enabled: el.dataset.on !== '1' }, `${el.dataset.alerts}: alerts ${el.dataset.on === '1' ? 'off' : 'on'}`)));
+  wirePresets();
+}
+
+/** 'Tue 3:42pm' for this week, 'Nov 12' for older. */
+function when2(iso) {
+  const d = new Date(iso);
+  const days = (Date.now() - d) / 86400000;
+  if (days < 6) return d.toLocaleDateString(undefined, { weekday: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).replace(' ', '').toLowerCase();
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 async function toggleTarget(course, crn) {
@@ -217,13 +323,15 @@ async function renderSchedules() {
   const r = await (await fetch(`/api/schedules?strict=${strict ? 1 : 0}`)).json();
   const colors = Object.fromEntries(S.config.courses.map((c, i) => [c.course, COLORS[i % COLORS.length]]));
   let html = `<div class="toolbar"><label class="check"><input type="checkbox" id="strict" ${strict ? 'checked' : ''}> Only sections that fit my rules</label><span class="note">Built from sections with open seats right now (waitlist seats don't count). Ranked by fewest days on campus, then no early mornings, late nights or long gaps.</span></div>`;
+  html += `<p class="note" style="margin-top:-6px">Sections you've marked as yours always count, seats or not. Switching? Add the new CRN and drop the old one in the same submit.</p>`;
   if (r.noSeats.length) html += `<div class="banner">No open ${strict ? 'sections that fit your rules' : 'sections'} in ${r.noSeats.join(', ')}. ${strict ? 'Uncheck "Only sections that fit my rules" to see backups.' : 'Join a waitlist or let the watcher catch a drop.'}</div>`;
   else if (!r.complete && r.missing.length) html += `<div class="banner">No week fits everything. These leave out ${r.missing.join(', ')}.</div>`;
   if (!r.schedules.length) html += `<div class="card"><p class="note">Nothing to build yet.</p></div>`;
   r.schedules.forEach((s, i) => {
     const crns = s.picks.map((p) => p.sections[0].crn).join(', ');
-    html += `<div class="card"><h2>Option ${i + 1} <small>${esc(s.summary)}</small></h2>${grid(s.picks, colors)}<div class="picks">${s.picks
-      .map((p) => `<div class="pick"><span class="dot" style="background:${colors[p.course]}"></span><b>${esc(p.course)}</b><span>${esc(p.meetings.map((m) => `${m.days} ${clock(m.begin)}-${clock(m.end)}`).join(' + '))}</span><span>CRN <span class="crn" data-crn="${p.sections[0].crn}">${p.sections[0].crn}</span> (${p.sections[0].seats} open${p.sections[0].instructor ? `, ${esc(p.sections[0].instructor)}` : ''})</span>${p.sections.length > 1 ? `<span class="alts">or ${p.sections.slice(1, 5).map((x) => `${x.crn} (${x.seats})`).join(', ')}${p.sections.length > 5 ? '...' : ''}</span>` : ''}</div>`)
+    const changeNote = s.picks.some((p) => p.current) ? ` · ${s.changes ? `${s.changes} change${s.changes > 1 ? 's' : ''} from your week` : 'your week as it is'}` : '';
+    html += `<div class="card"><h2>Option ${i + 1} <small>${esc(s.summary)}${changeNote}</small></h2>${grid(s.picks, colors)}<div class="picks">${s.picks
+      .map((p) => `<div class="pick"><span class="dot" style="background:${colors[p.course]}"></span><b>${esc(p.course)}</b><span>${esc(p.meetings.map((m) => `${m.days} ${clock(m.begin)}-${clock(m.end)}`).join(' + '))}</span><span>CRN <span class="crn" data-crn="${p.sections[0].crn}">${p.sections[0].crn}</span> (${p.current ? 'yours' : `${p.sections[0].seats} open`}${p.sections[0].instructor ? `, ${esc(p.sections[0].instructor)}` : ''})</span>${p.sections.length > 1 ? `<span class="alts">or ${p.sections.slice(1, 5).map((x) => `${x.crn} (${x.seats})`).join(', ')}${p.sections.length > 5 ? '...' : ''}</span>` : ''}</div>`)
       .join('')}</div><p class="note"><button class="btn alt" data-copy="${crns}">Copy CRNs</button>&nbsp; Paste into Athena's "Enter CRNs" tab.</p></div>`;
   });
   $('#schedules').innerHTML = html;
@@ -247,11 +355,72 @@ function grid(picks, colors) {
     h += `<div class="col" style="height:${height}px">`;
     for (let t = start; t < end; t += 60) h += `<div class="hr" style="top:${(t - start) * px}px"></div>`;
     for (const p of picks) for (const m of p.meetings) if (m.days.includes(d)) {
-      h += `<div class="block" style="top:${(mins(m.begin) - start) * px}px;height:${(mins(m.end) - mins(m.begin)) * px}px;background:${colors[p.course]}">${esc(p.course)}<span>${clock(m.begin)}</span></div>`;
+      h += `<div class="block ${p.waitlisted ? 'wl' : ''}" style="top:${(mins(m.begin) - start) * px}px;height:${(mins(m.end) - mins(m.begin)) * px}px;background:${colors[p.course]};color:${p.waitlisted ? colors[p.course] : '#0d0f12'}">${esc(p.course)}<span>${clock(m.begin)}${p.waitlisted ? ' · waitlisted' : ''}</span></div>`;
     }
     h += `</div>`;
   }
   return h + `</div>`;
+}
+
+// ---------- finder: any open class that fits your week ----------
+const F = { min: '3000', grad: false, credits: '3', format: 'any', open: true, around: true, fits: false, days: '', after: '', before: '', exclude: '', subjects: '', text: '' };
+const LEVELS = [['', 'Any level'], ['1000', '1000+'], ['2000', '2000+'], ['3000', '3000+ (upper level)'], ['4000', '4000+']];
+async function renderFinder(again = false) {
+  const day = (d) => `<span class="day ${F.days.includes(d) ? 'on' : ''}" data-fd="${d}">${DAY[d]}</span>`;
+  const sel = (id, opts, v) => `<select id="${id}">${opts.map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+  const times = [['', 'Any time'], ['0830', '8:30am'], ['0900', '9:00am'], ['0930', '9:30am'], ['1000', '10:00am'], ['1100', '11:00am'], ['1200', '12:00pm'], ['1300', '1:00pm']];
+  const ends = [['', 'Any time'], ['1200', '12:00pm'], ['1400', '2:00pm'], ['1500', '3:00pm'], ['1600', '4:00pm'], ['1700', '5:00pm'], ['1800', '6:00pm']];
+  if (!again) $('#finder').innerHTML = `<div class="card"><h2>Find a class <small>Every section this term, filtered to ones you can actually take</small></h2>
+    <div class="fgrid" style="margin-top:12px">
+      <div class="field"><label class="l">Level</label>${sel('f_min', LEVELS, F.min)}</div>
+      <div class="field"><label class="l">Credit hours</label>${sel('f_credits', [['', 'Any'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']], F.credits)}</div>
+      <div class="field"><label class="l">Format</label>${sel('f_format', [['any', 'Online or in person'], ['online', 'Online only'], ['in_person', 'In person only']], F.format)}</div>
+      <div class="field"><label class="l">Starts no earlier than</label>${sel('f_after', times, F.after)}</div>
+      <div class="field"><label class="l">Ends by</label>${sel('f_before', ends, F.before)}</div>
+      <div class="field"><label class="l">Only these days</label><div class="days">${['M', 'T', 'W', 'R', 'F'].map(day).join('')}</div><div class="hint">None picked means any day.</div></div>
+      <div class="field"><label class="l">Leave out subjects</label><input type="text" id="f_exclude" value="${esc(F.exclude)}" placeholder="FINA, CHEM"></div>
+      <div class="field"><label class="l">Only these subjects</label><input type="text" id="f_subjects" value="${esc(F.subjects)}" placeholder="any"></div>
+      <div class="field"><label class="l">Title has</label><input type="text" id="f_text" value="${esc(F.text)}" placeholder="leadership"></div>
+    </div>
+    <div class="toolbar" style="margin:4px 0 0">
+      <label class="check"><input type="checkbox" id="f_open" ${F.open ? 'checked' : ''}> Open now (nobody waiting)</label>
+      <label class="check"><input type="checkbox" id="f_around" ${F.around ? 'checked' : ''}> Fits around my week</label>
+      <label class="check"><input type="checkbox" id="f_fits" ${F.fits ? 'checked' : ''}> Fits my rules</label>
+      <label class="check"><input type="checkbox" id="f_grad" ${F.grad ? 'checked' : ''}> Include graduate courses (6000+)</label>
+      <button class="btn" id="f_go" type="button">Search</button>
+    </div>
+    <p class="note">Your degree decides what counts (Terry's upper-level electives, for example, are 3-hour courses numbered 3000 and up). Check prerequisites in the UGA Bulletin before you register.</p></div>
+    <div id="f_out"></div>`;
+  document.querySelectorAll('[data-fd]').forEach((el) => (el.onclick = () => { el.classList.toggle('on'); }));
+  const read = () => {
+    F.min = $('#f_min').value; F.credits = $('#f_credits').value; F.format = $('#f_format').value; F.after = $('#f_after').value; F.before = $('#f_before').value;
+    F.days = [...document.querySelectorAll('[data-fd].on')].map((el) => el.dataset.fd).join('');
+    F.exclude = $('#f_exclude').value; F.subjects = $('#f_subjects').value; F.text = $('#f_text').value;
+    F.open = $('#f_open').checked; F.around = $('#f_around').checked; F.fits = $('#f_fits').checked; F.grad = $('#f_grad').checked;
+  };
+  $('#f_go').onclick = () => { read(); search(); };
+  $('#f_text').onkeydown = (e) => { if (e.key === 'Enter') { read(); search(); } };
+  if (!again) search();
+}
+async function search() {
+  const q = new URLSearchParams({ min: F.min, max: F.grad ? '' : '5999', credits: F.credits, format: F.format, open: F.open ? '1' : '0', around_week: F.around ? '1' : '0', fits_rules: F.fits ? '1' : '0', days: F.days, after: F.after, before: F.before, exclude: F.exclude.toUpperCase().replace(/\s+/g, ''), subjects: F.subjects.toUpperCase().replace(/\s+/g, ''), text: F.text, limit: '60' });
+  $('#f_out').innerHTML = `<p class="note">Searching...</p>`;
+  const r = await fetch('/api/finder?' + q);
+  const d = await r.json();
+  if (r.status === 202) {
+    $('#f_out').innerHTML = `<div class="card"><p class="note">First search of the day: downloading every section of the term from Athena, slowly so it doesn't strain it. About a minute${d.progress?.total ? ` (${d.progress.done} of ${d.progress.total})` : ''}.</p></div>`;
+    clearTimeout(search.t); search.t = setTimeout(() => { if (!$('#finder').hidden) search(); }, 4000);
+    return;
+  }
+  if (!r.ok) { $('#f_out').innerHTML = `<div class="banner">${esc(d.error)}</div>`; return; }
+  let html = `<p class="note">${d.courses.length ? `${d.total} sections in ${d.shown < d.courses.length ? `${d.shown}+` : d.courses.length} courses` : 'Nothing matches. Loosen a filter or two.'} · class list from ${ago(d.at)} · <a href="#" id="f_refresh">refresh</a></p>`;
+  html += `<div class="card">${d.courses.map((c) => `<div class="result"><b>${esc(c.course)}</b> <span class="sub">${esc(c.title)} · ${esc(c.credits ?? '')} hrs</span> <button class="btn alt" style="padding:3px 10px;font-size:12.5px;margin-left:6px" data-watch="${esc(c.course)}">Watch</button>
+    ${c.sections.slice(0, 4).map((s) => `<div class="sec"><span class="when">${esc(s.remote ? 'Online' : s.begin ? when(s) : 'Time TBA')}</span><span class="crn" data-crn="${s.crn}">CRN ${s.crn}</span><span style="color:${s.seats > 0 ? 'var(--green)' : 'var(--quiet)'}">${s.seats > 0 ? `${s.seats} open` : s.waiting ? `${s.waiting} waiting` : 'Full'}</span><span class="who">${rmp(s.instructor)}</span>${s.meetings[0]?.building && !s.remote ? `<span class="note" style="margin:0">${esc(s.meetings[0].building)}</span>` : ''}</div>`).join('')}
+    ${c.sections.length > 4 ? `<div class="note">${c.sections.length - 4} more sections</div>` : ''}</div>`).join('')}</div>`;
+  $('#f_out').innerHTML = html;
+  document.querySelectorAll('#f_out [data-crn]').forEach((el) => (el.onclick = () => copy(el.dataset.crn, `CRN ${el.dataset.crn}`)));
+  document.querySelectorAll('#f_out [data-watch]').forEach((el) => (el.onclick = () => setHeld(el.dataset.watch, { enabled: true }, `Watching ${el.dataset.watch}`)));
+  $('#f_refresh').onclick = async (e) => { e.preventDefault(); await fetch('/api/finder?refresh=1'); search(); };
 }
 
 // ---------- settings ----------
@@ -264,8 +433,9 @@ async function renderSettings() {
   $('#settings').innerHTML = `<form id="f" onsubmit="return false">
   <div class="card"><h2>Courses</h2><div id="courses"></div>
     <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newCourse" placeholder="Add a course, like BUSN 4000"><button class="btn alt" id="add" type="button">Add</button></div>
-    <p class="note">Switch targets: if you're already registered and only want to hear about certain sections, put their CRNs here (or star them on the Seats tab).</p></div>
-  <div class="card"><h2>Your rules</h2><p class="note">Sections outside your rules still show on the Seats tab. They just don't send alerts or go in suggested schedules.</p>
+    <p class="note">Registered / Waitlisted: the section you hold, so Home can plan around it (or mark it on the Seats tab, or sync from Athena with the Chrome extension). Alerts off still checks a course you hold, so your week stays current. Switch targets: only alert for these CRNs.</p></div>
+  <div class="card"><h2>Your rules</h2><p class="note">Sections outside your rules still show on the Seats tab. They just don't send alerts or go in suggested schedules. Quick picks save right away:</p>
+    <div style="margin:10px 0 16px">${presetBar(c.rules)}</div>
     <div class="two">
       <div class="field"><label class="l">Earliest start</label><input type="text" name="earliest" value="${esc(c.rules.earliest)}" placeholder="any"><div class="hint">Like 9:30. Blank means any time.</div></div>
       <div class="field"><label class="l">Latest end</label><input type="text" name="latest" value="${esc(c.rules.latest)}" placeholder="any"><div class="hint">Like 17:00 for 5pm. Blank means any time.</div></div>
@@ -291,7 +461,9 @@ async function renderSettings() {
   </form>`;
   const courses = structuredClone(c.courses);
   const drawCourses = () => {
-    $('#courses').innerHTML = courses.map((x, i) => `<div class="course"><b>${esc(x.course)}</b><input type="text" data-targets="${i}" value="${esc((x.targets ?? []).join(', '))}" placeholder="Switch targets (CRNs), optional"><label class="check"><input type="checkbox" data-on="${i}" ${x.enabled !== false ? 'checked' : ''}> Watch</label><button class="btn alt" type="button" data-rm="${i}">Remove</button></div>`).join('') || '<p class="note">None yet.</p>';
+    $('#courses').innerHTML = courses.map((x, i) => `<div class="course"><b>${esc(x.course)}</b><div style="display:grid;gap:6px"><input type="text" data-targets="${i}" value="${esc((x.targets ?? []).join(', '))}" placeholder="Switch targets (CRNs), optional"><div style="display:flex;gap:6px"><input type="text" data-reg="${i}" value="${esc(x.registered ?? '')}" placeholder="Registered CRN" style="max-width:170px"><input type="text" data-wl="${i}" value="${esc(x.waitlisted ?? '')}" placeholder="Waitlisted CRN" style="max-width:170px"></div></div><label class="check"><input type="checkbox" data-on="${i}" ${x.enabled !== false ? 'checked' : ''}> Alerts</label><button class="btn alt" type="button" data-rm="${i}">Remove</button></div>`).join('') || '<p class="note">None yet.</p>';
+    document.querySelectorAll('[data-reg]').forEach((el) => (el.oninput = () => (courses[+el.dataset.reg].registered = el.value.trim())));
+    document.querySelectorAll('[data-wl]').forEach((el) => (el.oninput = () => (courses[+el.dataset.wl].waitlisted = el.value.trim())));
     document.querySelectorAll('[data-rm]').forEach((el) => (el.onclick = () => { courses.splice(+el.dataset.rm, 1); drawCourses(); }));
     document.querySelectorAll('[data-on]').forEach((el) => (el.onchange = () => (courses[+el.dataset.on].enabled = el.checked)));
     document.querySelectorAll('[data-targets]').forEach((el) => (el.oninput = () => (courses[+el.dataset.targets].targets = el.value.split(/[ ,]+/).filter(Boolean))));
@@ -317,18 +489,21 @@ async function renderSettings() {
     };
     if (await save(cfg, 'Saved. Checking with the new settings...')) { delete $('#settings').dataset.ready; renderSettings(); }
   };
+  wirePresets();
 }
 
 function showTab(t) {
   document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === t));
   history.replaceState(null, '', '#' + t.dataset.tab);
-  for (const id of ['seats', 'schedules', 'settings']) $('#' + id).hidden = id !== t.dataset.tab;
+  for (const id of ['home', 'seats', 'schedules', 'finder', 'settings']) $('#' + id).hidden = id !== t.dataset.tab;
+  if (t.dataset.tab === 'home') renderHome();
   if (t.dataset.tab === 'schedules') renderSchedules();
+  if (t.dataset.tab === 'finder') renderFinder();
   if (t.dataset.tab === 'settings') renderSettings();
 }
 
 // ---------- first-time setup ----------
-const W = { step: 0, term: null, termName: '', terms: [], courses: [], rules: { earliest: '09:00', latest: '', skip_days: '', preferred_days: '', allow_online: true }, phone: true, ntfy: '', discord: '', autostart: true, error: '' };
+const W = { step: 0, term: null, termName: '', terms: [], courses: [], rules: { earliest: '', latest: '', skip_days: '', preferred_days: '', allow_online: true }, more: false, phone: true, ntfy: '', discord: '', autostart: true, error: '' };
 const TIMES = ['', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '12:00'];
 const ENDS = ['', '14:00', '15:00', '16:00', '16:30', '17:00', '17:30', '18:00', '19:00'];
 const nice = (t) => (t ? clock(t.replace(':', '')) : 'Any time');
@@ -361,10 +536,12 @@ function drawSetup() {
   } else if (W.step === 1) {
     body = `<h1>Your courses</h1><p class="lead">Add each course you need, like BUSN 4000. It checks Athena as you go.</p>
       <div class="card"><div style="display:flex;gap:8px"><input type="text" id="wc" placeholder="BUSN 4000" autofocus><button class="btn" id="wadd" type="button">Add</button></div>${err}
-      ${W.courses.map((c, i) => `<div class="added"><div><b>${esc(c.course)}</b> <small>${esc(c.title)}</small><br><small>${c.sections} sections, ${c.open} with open seats</small></div><button class="btn alt" data-wrm="${i}" type="button">Remove</button></div>`).join('') || '<p class="note">None yet.</p>'}</div>`;
+      ${W.courses.map((c, i) => `<div class="added"><div><b>${esc(c.course)}</b> <small>${esc(c.title)}</small><br><small>${c.sections} sections, ${c.open} with open seats</small></div><button class="btn alt" data-wrm="${i}" type="button">Remove</button></div>`).join('') || '<p class="note">None yet.</p>'}
+      <p class="note">Already registered for some? Add them too, then mark your section on the Seats tab, so it can plan around your week.</p></div>`;
   } else if (W.step === 2) {
-    body = `<h1>Your rules</h1><p class="lead">Sections outside these still show up. They just won't alert you or go in suggested schedules. You can change all of this later.</p>
-      <div class="card"><div class="two">
+    body = `<h1>Your rules</h1><p class="lead">Pick any that matter to you, or none. Sections outside your rules still show up; they just won't alert you or go in suggested schedules. One click turns each off again later.</p>
+      <div class="card">${presetBar(W.rules, 'data-wpreset')}<p class="note"><a href="#" id="wmore">${W.more ? 'Hide' : 'More'} options</a></p></div>
+      <div class="card" ${W.more ? '' : 'hidden'}><div class="two">
         <div class="field"><label class="l">Earliest a class can start</label><select id="we">${TIMES.map((t) => `<option value="${t}" ${t === W.rules.earliest ? 'selected' : ''}>${t ? nice(t) : 'Any time'}</option>`).join('')}</select></div>
         <div class="field"><label class="l">Latest a class can end</label><select id="wl">${ENDS.map((t) => `<option value="${t}" ${t === W.rules.latest ? 'selected' : ''}>${t ? nice(t) : 'Any time'}</option>`).join('')}</select></div>
       </div>
@@ -413,6 +590,8 @@ function wireSetup() {
   };
   if ($('#wadd')) { $('#wadd').onclick = add; $('#wc').onkeydown = (e) => { if (e.key === 'Enter') add(); }; }
   if ($('#we')) { $('#we').onchange = (e) => (W.rules.earliest = e.target.value); $('#wl').onchange = (e) => (W.rules.latest = e.target.value); $('#wo').onchange = (e) => (W.rules.allow_online = e.target.checked); }
+  document.querySelectorAll('[data-wpreset]').forEach((el) => (el.onclick = () => { const p = PRESETS[+el.dataset.wpreset]; p.set(W.rules, !p.on(W.rules)); drawSetup(); }));
+  if ($('#wmore')) $('#wmore').onclick = (e) => { e.preventDefault(); W.more = !W.more; drawSetup(); };
   if ($('#wp')) { $('#wp').onchange = (e) => { W.phone = e.target.checked; drawSetup(); }; $('#wd').oninput = (e) => (W.discord = e.target.value.trim()); }
   if ($('#wtest')) $('#wtest').onclick = async () => {
     const r = await (await fetch('/api/test-alert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alerts: alertsNow() }) })).json();
@@ -449,10 +628,10 @@ $('#now').onclick = async () => { $('#now').disabled = true; $('#sub').textConte
 $('#reg').onclick = () => window.open(S?.config.school.register_url || 'https://athena.uga.edu', '_blank');
 load().then(() => {
   if (S.needs_setup) return;
-  const t = document.querySelector(`.tab[data-tab="${location.hash.slice(1)}"]`);
-  if (t) showTab(t);
+  const t = document.querySelector(`.tab[data-tab="${location.hash.slice(1)}"]`) || document.querySelector('.tab[data-tab="home"]');
+  showTab(t);
 });
-setInterval(() => { if ($('#settings').hidden && $('#setup').hidden) load(); }, 20000);
+setInterval(() => { if ($('#settings').hidden && $('#finder').hidden && $('#setup').hidden) load(); }, 20000);
 </script>
 </body>
 </html>
