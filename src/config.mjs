@@ -1,4 +1,4 @@
-// config.json: what to watch and how. Written by setup.mjs and by the Settings tab, read again on
+// config.json: what to watch and how. Written by setup in the browser and by the Settings tab, read again on
 // every check, so edits apply within a few minutes without a restart.
 
 import { CONFIG, readJson, writeJson } from './paths.mjs';
