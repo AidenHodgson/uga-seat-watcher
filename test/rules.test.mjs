@@ -39,7 +39,9 @@ test('seats held for the waitlist do not count as open', () => {
   assert.equal(s.seats, 0);
   assert.equal(s.raw_seats, 1);
   assert.equal(s.waiting, 19);
-  assert.equal(toSection({ ...raw, seatsAvailable: 5, waitCount: 2 }).seats, 3);
+  // More seats than people waiting still isn't open: Athena holds them all (22779, Nov 19: 17 open, 16 waiting).
+  assert.equal(toSection({ ...raw, seatsAvailable: 17, waitCount: 16 }).seats, 0);
+  assert.equal(toSection({ ...raw, seatsAvailable: 5, waitCount: 0 }).seats, 5);
 });
 
 test('backups: take one when nothing that fits is open, then once more when they run low', () => {

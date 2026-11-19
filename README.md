@@ -7,8 +7,8 @@ schedules out of what's open right now. Runs on your own laptop, Windows or Mac.
 
 - **No UGA login, no Duo.** It reads Athena's public "Browse Classes" search, the same one anyone
   can use without signing in.
-- **Only real seats count.** Athena gives an open seat to the waitlist first, so a seat only counts
-  as open when more seats are open than people waiting.
+- **Only real seats count.** While anyone is on a section's waitlist, Athena holds every open seat
+  for them, so a section only counts as open when nobody is waiting.
 - **Your rules.** Earliest start, latest end, days to skip, days you prefer, online or not.
 - **Backups.** A seat you don't love beats no seat. If everything that fits is full, it tells you
   which sections still have room.
@@ -94,7 +94,7 @@ knowing the project. `AGENTS.md` points other agents to the same file.
 | The launcher opens someone else's page, or says another copy is running | Another copy is already using port 4830. The message says which folder; run `node watcher.mjs --uninstall` there first. |
 | No desktop alerts on Mac | System Settings > Notifications > Script Editor > Allow. |
 | Stops working after a Mac restart | The folder is in Desktop, Documents or Downloads. Move it to your home folder and run the launcher again. |
-| Says a section is full but Athena shows a seat | Someone is on the waitlist, and that seat is theirs. |
+| Says a section is full but Athena shows seats | Someone is on the waitlist, so Athena holds every open seat for the waitlist. Join it, or wait for it to clear. |
 | Nothing at all | Check the log: `%LOCALAPPDATA%\uga-seat-watcher\watcher.log` on Windows, `~/Library/Application Support/uga-seat-watcher/watcher.log` on Mac. |
 
 ## Commands

@@ -183,7 +183,7 @@ function renderSeats() {
         <div><div class="when">${esc(when(s))}</div><div class="chips">${chips.join('')}</div></div>
         <div class="who">${rmp(s.instructor) || '<span class="note">Instructor TBA</span>'}${s.meetings[0]?.building ? `<div class="note" style="margin:0">${esc(s.meetings[0].building)} ${esc(s.meetings[0].room ?? '')}</div>` : ''}</div>
         <div><span class="crn" data-crn="${s.crn}">CRN ${s.crn}</span><button class="star ${isTarget ? 'on' : ''}" data-course="${esc(c.course)}" data-star="${s.crn}" title="Switch target">${isTarget ? '★' : '☆'}</button></div>
-        <div class="seats ${s.seats > 0 ? 'open' : 'none'}">${s.seats > 0 ? `${s.seats} open` : 'Full'}<small>of ${s.max}${s.raw_seats > s.seats ? `, ${s.raw_seats - s.seats} held for waitlist` : ''}</small></div>
+        <div class="seats ${s.seats > 0 ? 'open' : 'none'}">${s.seats > 0 ? `${s.seats} open` : 'Full'}<small>of ${s.max}${s.raw_seats > s.seats ? `, ${s.raw_seats} held for the waitlist` : ''}</small></div>
       </div>`;
     }
     html += `</div>`;

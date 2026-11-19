@@ -44,7 +44,7 @@ Everything downstream uses what `toSection` returns:
   days, begin, end,          // first meeting, for quick display
   online,                    // no set time, or Athena says online
   instructor,
-  seats,                     // REAL open seats: seatsAvailable minus waitCount, never below 0
+  seats,                     // REAL open seats: 0 while anyone is waiting, else seatsAvailable
   raw_seats, waiting, max }
 ```
 
@@ -52,9 +52,11 @@ Days use Banner letters: M T W R(Thursday) F S U. Times are `'HHMM'` strings, co
 
 ## Things that will bite you (all learned the hard way)
 
-1. **Seats held for the waitlist aren't open.** Athena gives an open seat to the waitlist first.
-   `seatsAvailable: 1` with `waitCount: 19` means nobody new can register. `seats` already
-   subtracts `waiting`; keep it that way everywhere.
+1. **Seats held for the waitlist aren't open.** While anyone is on a section's waitlist, Athena
+   holds every open seat for the waitlist, even with more seats than people waiting:
+   `seatsAvailable: 17` with `waitCount: 16` still says "Seat(s) Reserved for Waitlist" to a new
+   student. `seats` is 0 whenever `waiting > 0`; keep it that way everywhere. (The first version
+   subtracted `waiting` instead, and that was wrong.)
 2. **Every Athena request needs a fresh connection.** Athena's load balancer ties a search session to
    the TCP connection. Node's `fetch` reuses pooled connections, so a session started on one could
    be searched on another and come back with zero sections, silently. `athena.mjs` uses

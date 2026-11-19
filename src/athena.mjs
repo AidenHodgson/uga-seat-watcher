@@ -134,9 +134,10 @@ export function toSection(c) {
     end: m0?.endTime ?? null,
     online: !m0 || /online|web|virtual|distance|ecore/i.test(where),
     instructor: (c.faculty ?? []).map((f) => f.displayName).filter(Boolean).join(', ') || null,
-    // Athena gives an open seat to the waitlist first, so a seat is only really open to a new
-    // student when more seats are open than students waiting.
-    seats: Math.max(0, rawSeats - waiting),
+    // While anyone is on the waitlist, Athena holds every open seat for the waitlist ("Seat(s)
+    // Reserved for Waitlist"), even when there are more seats than people waiting. A seat is only
+    // open to a new student when nobody is waiting.
+    seats: waiting > 0 ? 0 : Math.max(0, rawSeats),
     raw_seats: rawSeats,
     waiting,
     max: Number(c.maximumEnrollment) || 0,
